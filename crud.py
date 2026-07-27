@@ -25,8 +25,8 @@ def upsert_article(
     db: Session, 
     scopus_id: str, 
     art_name: str, 
-    journal_name: str, 
-    cov_date, 
+    publication_name: str, 
+    cover_date, 
     doi: str, 
     citedby_count: int, 
     author_objs: list, 
@@ -41,8 +41,8 @@ def upsert_article(
         article = Article(
             scopus_id=scopus_id,
             art_name=art_name,
-            journal_name=journal_name,
-            cov_date=cov_date,
+            publication_name=publication_name,
+            cover_date=cover_date,
             doi=doi,
             citedby_count=citedby_count
         )
