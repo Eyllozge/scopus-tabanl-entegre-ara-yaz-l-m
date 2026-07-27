@@ -1,7 +1,8 @@
+import os
 import requests
 import json
 
-API_KEY = "a3836c4d84b930e321232186e37392dd"
+API_KEY = os.getenv("SCP_API")
 
 URL = "https://api.elsevier.com/content/search/scopus"
 
