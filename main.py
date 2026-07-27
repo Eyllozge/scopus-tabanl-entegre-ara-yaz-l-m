@@ -12,6 +12,7 @@ from models import Author
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 from database import SessionLocal 
+from fastapi.middleware.cors import CORSMiddleware
 
 
 def scheduled_scopus_sync():
@@ -37,6 +38,15 @@ app = FastAPI(
     description="Fırat Üniversitesi Scopus yayınlarını çeken ve veritabanına işleyen API",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# CORS yapısı
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # canlıda buraya sadece kendi frontend URL'i yazılacak. Vercel muhtemelen
+    allow_credentials=True,
+    allow_methods=["*"], 
+    allow_headers=["*"],
 )
 
 @app.get("/")
