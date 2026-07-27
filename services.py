@@ -96,7 +96,7 @@ def sync_scopus_data(db: Session, query: str = "AFFIL(Firat University) AND PUBY
         #Sayfalama Atlama: Bir sonraki sayfa için 'start' değerini 25 artırıyoruz.
         start += count
         
-        #Eğer ulaştığımız sıra, toplam sayıyı geçtiyse döngüyü bitir.
+        #Eğer sıra toplam sayıyı geçtiyse döngüyü bitir.
         if start >= total_results:
             break
             
