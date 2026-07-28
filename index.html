@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Akademik Atıf Dizini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <svg class="seal" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <circle cx="32" cy="32" r="23" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <circle cx="32" cy="32" r="4" fill="currentColor"/>
+    </svg>
+    <div class="masthead-text">
+      <h1>Akademik Atıf Dizini</h1>
+      <p class="eyebrow">Fırat Üniversitesi · Scopus Tabanlı Yayın Arşivi</p>
+    </div>
+  </header>
+
+  <div class="content">
+  <section class="search-panel">
+    <div class="search-row">
+      <select id="searchType" class="field-select" aria-label="Arama alanı">
+        <option value="all">Tüm Alanlar</option>
+        <option value="title">Makale Adı</option>
+        <option value="author">Yazar</option>
+        <option value="journal">Dergi Adı</option>
+      </select>
+      <input type="text" id="searchInput" class="field-input" placeholder="Aramak istediğiniz terimi girin…">
+      <button id="searchBtn" class="btn-primary">Ara</button>
+    </div>
+
+    <div class="filter-row">
+      <label class="switch">
+        <input type="checkbox" id="sortCitations">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Atıfa göre sırala</span>
+      </label>
+
+      <div class="slider-group">
+        <label for="minCitations">En az atıf<span id="minCitationsValue" class="slider-value">0</span></label>
+        <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
+      </div>
+    </div>
+  </section>
+
+  <section class="results">
+    <div id="resultsMeta" class="results-meta" role="status"></div>
+    <div id="resultsArea" class="results-list">
+      <div class="empty-state">Aramaya başlamak için bir anahtar kelime girin.</div>
+    </div>
+  </section>
+  </div>
+
+</div>
+
+<script>
+const API_BASE_URL = "https://scopus-tabanl-entegre-ara-yaz-l-m.onrender.com/api";
+
+const searchBtn = document.getElementById('searchBtn');
+const searchInput = document.getElementById('searchInput');
+const searchType = document.getElementById('searchType');
+const sortCitations = document.getElementById('sortCitations');
+const minCitations = document.getElementById('minCitations');
+const minCitationsValue = document.getElementById('minCitationsValue');
+const resultsArea = document.getElementById('resultsArea');
+const resultsMeta = document.getElementById('resultsMeta');
+
+minCitations.addEventListener('input', () => {
+  minCitationsValue.textContent = minCitations.value + (minCitations.value === minCitations.max ? '+' : '');
+});
+
+function getScopusUrl(scopusId) {
+  const eid = String(scopusId).startsWith('2-s2.0-') ? scopusId : `2-s2.0-${scopusId}`;
+  return `https://www.scopus.com/record/display.uri?eid=${eid}&origin=resultslist`;
+}
+
+function showEmpty(message, isError = false) {
+  resultsMeta.textContent = '';
+  resultsArea.innerHTML = `<div class="empty-state${isError ? ' error' : ''}">${message}</div>`;
+}
+
+function renderResults(articles) {
+  resultsMeta.innerHTML = `<strong>${articles.length}</strong> sonuç bulundu`;
+
+  const maxCitations = Math.max(...articles.map(a => a.citedby_count), 1);
+
+  resultsArea.innerHTML = articles.map(article => {
+    const authorsList = article.authors.map(a => a.auth_fullname).join(', ') || 'Yazar bilgisi yok';
+    const scopusLink = getScopusUrl(article.scopus_id);
+    const pct = Math.min(article.citedby_count / maxCitations, 1).toFixed(3);
+
+    return `
+      <div class="result-item">
+        <div class="seal-badge" style="--pct:${pct}">
+          <span>${article.citedby_count}</span>
+        </div>
+        <div class="result-body">
+          <a href="${scopusLink}" target="_blank" rel="noopener" class="article-title">${article.art_name}</a>
+          <div class="article-authors">${authorsList}</div>
+          <div class="article-meta">${article.publication_name || 'Dergi bilgisi yok'}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function runSearch() {
+  const query = searchInput.value.trim().toLowerCase();
+
+  if (!query) {
+    showEmpty('Lütfen aramak için bir kelime girin.', true);
+    return;
+  }
+
+  showEmpty('Makaleler taranıyor…');
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/articles?limit=300`);
+    const data = await response.json();
+
+    const filterType = searchType.value;
+    const minCount = Number(minCitations.value);
+
+    let filtered = data.filter(article => {
+      const titleMatch = article.art_name.toLowerCase().includes(query);
+      const journalMatch = article.publication_name && article.publication_name.toLowerCase().includes(query);
+      const authorsList = article.authors.map(a => a.auth_fullname.toLowerCase()).join(' ');
+      const authorMatch = authorsList.includes(query);
+
+      let matchesQuery;
+      if (filterType === 'title') matchesQuery = titleMatch;
+      else if (filterType === 'author') matchesQuery = authorMatch;
+      else if (filterType === 'journal') matchesQuery = journalMatch;
+      else matchesQuery = titleMatch || journalMatch || authorMatch;
+
+      return matchesQuery && article.citedby_count >= minCount;
+    });
+
+    if (sortCitations.checked) {
+      filtered.sort((a, b) => b.citedby_count - a.citedby_count);
+    }
+
+    if (filtered.length === 0) {
+      showEmpty('Belirttiğiniz filtreye ve arama terimine uygun makale bulunamadı.');
+      return;
+    }
+
+    renderResults(filtered);
+
+  } catch (error) {
+    showEmpty('Sunucuya bağlanılamadı. API hizmetinin çalıştığından emin olun.', true);
+  }
+}
+
+searchBtn.addEventListener('click', runSearch);
+searchInput.addEventListener('keypress', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    runSearch();
+  }
+});
+</script>
+</body>
+</html>
