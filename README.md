@@ -91,7 +91,7 @@ JSON
     "authors": [
       {
         "auth_id": 1,
-        "auth_fullname": "Kılınç, Ahmet Çağrı"
+        "auth_fullname": "Öz, Çağrı"
       }
     ]
   }
