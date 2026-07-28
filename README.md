@@ -1,6 +1,5 @@
-# 🎓 Fırat Üniversitesi Scopus Akademik Veri Entegrasyon Sistemi ve Paneli
+# 🎓 Scopus Akademik Veri Entegrasyon Sistemi ve Paneli
 
-**Hazırlayan:** Özge Gündoğdu
 **Platform:** Web (Bağımsız Mikroservis Mimarisi)
 
 ---
