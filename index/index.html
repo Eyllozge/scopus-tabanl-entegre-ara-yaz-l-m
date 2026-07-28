@@ -124,7 +124,7 @@ async function runSearch() {
   showEmpty('Makaleler taranıyor…');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/articles?limit=300`);
+    const response = await fetch(`${API_BASE_URL}/api/articles?limit=300`);
     const data = await response.json();
 
     const filterType = searchType.value;
