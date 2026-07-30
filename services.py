@@ -3,101 +3,87 @@ import requests
 from datetime import datetime
 from sqlalchemy.orm import Session
 import crud
+from models import Article
 
-API_KEY = os.getenv("SCP_API") 
-BASE_URL = "https://api.elsevier.com/content/search/scopus"
+SCP_API_KEY = os.getenv("SCP_API")
+SCOPUS_BASE_URL = "https://api.elsevier.com/content/abstract/doi"
+OPENALEX_BASE_URL = "https://api.openalex.org/works"
+OPENALEX_INSTITUTION_ID = "I143396566"  # Fırat Üniversitesi 
 
-def sync_scopus_data(db: Session, query: str = "AFFIL(Firat University) AND PUBYEAR IS 2024"):
-    headers = {
-        "X-ELS-APIKey": API_KEY,
-        "Accept": "application/json"
-    }
-    
-    start = 0
-    count = 25
-    total_processed = 0
-    total_results = None 
-    
-    print("Scopustan makale senkronizasyonu")
-    
+ENABLE_SCOPUS_FETCH = False
+
+
+def get_new_dois_from_openalex(db: Session, per_page: int = 200) -> list[str]:
+    """OpenAlex'ten kuruma ait tüm DOI'leri çeker, DB'de olmayanları döner."""
+    existing_dois = {row[0] for row in db.query(Article.doi).filter(Article.doi.isnot(None)).all()}
+    new_dois = []
+    cursor = "*"
+
     while True:
         params = {
-            "query": query,
-            "view": "STANDARD",
-            "count": count,
-            "start": start
+            "filter": f"institutions.id:{OPENALEX_INSTITUTION_ID}",
+            "per_page": per_page,
+            "cursor": cursor,
+            "select": "doi",
         }
-        
-        response = requests.get(BASE_URL, headers=headers, params=params)
-        
-        if response.status_code != 200:
-            print(f"API Hatası: {response.status_code} - {response.text}")
+        resp = requests.get(OPENALEX_BASE_URL, params=params)
+        if resp.status_code != 200:
+            print(f"OpenAlex hatası: {resp.status_code} - {resp.text}")
             break
-            
-        data = response.json()
-        search_results = data.get("search-results", {})
-        entries = search_results.get("entry", [])
-        
-        # Eğer gelen sayfada hiç makale yoksa döngüyü kır.
-        if not entries:
-            print("Çekilecek başka makale kalmadı.")
-            break
-            
-        # 2. Toplam Makale Sayısını Öğrenme (Sadece ilk döngüde çalışacak.)
-        if total_results is None:
-            total_results = int(search_results.get("opensearch:totalResults", 0))
-            print(f"Sistem toplam {total_results} adet makale tespit etti. İndirme işlemi başlatılıyor...")
 
-        for item in entries:
-            raw_id = item.get("dc:identifier", "")
-            scopus_id = raw_id.replace("SCOPUS_ID:", "") if raw_id else None
-            
-            if not scopus_id:
-                continue
-                
-            art_name = item.get("dc:title", "Bilinmeyen Başlık")
-            publication_name = item.get("prism:publicationName", "Bilinmeyen Dergi")
-            doi = item.get("prism:doi")
-            citedby_count = int(item.get("citedby-count", 0))
-            
-            raw_date = item.get("prism:coverDate")
-            cover_date = datetime.strptime(raw_date, "%Y-%m-%d").date() if raw_date else None
-            
-            author_name = item.get("dc:creator")
-            author_objs = []
-            if author_name:
-                author_obj = crud.get_or_create_author(db, author_name)
-                author_objs.append(author_obj)
-                
-            institution_objs = []
-            affiliations = item.get("affiliation", [])
-            for affil in affiliations:
-                inst_name = affil.get("affilname")
-                if inst_name:
-                    inst_obj = crud.get_or_create_institution(db, inst_name)
-                    institution_objs.append(inst_obj)
-                    
-            crud.upsert_article(
-                db=db,
-                scopus_id=scopus_id,
-                art_name=art_name,
-                publication_name=publication_name,
-                cover_date=cover_date, 
-                doi=doi,
-                citedby_count=citedby_count,
-                author_objs=author_objs,
-                institution_objs=institution_objs
-            )
-            total_processed += 1
-            
-        #İlerleme süreci
-        print(f"Durum: {total_processed} / {total_results} makale işlendi...")
-        
-        #Sayfalama Atlama: Bir sonraki sayfa için 'start' değerini 25 artırıyoruz.
-        start += count
-        
-        #Eğer sıra toplam sayıyı geçtiyse döngüyü bitir.
-        if start >= total_results:
+        data = resp.json()
+        results = data.get("results", [])
+        if not results:
             break
-            
-    print(f"Tüm senkronizasyon tamamlandı. Toplam {total_processed} makale veritabanına aktarıldı.")
+
+        for work in results:
+            raw_doi = work.get("doi")
+            if not raw_doi:
+                continue
+            doi = raw_doi.replace("https://doi.org/", "")
+            if doi not in existing_dois:
+                new_dois.append(doi)
+
+        cursor = data.get("meta", {}).get("next_cursor")
+        if not cursor:
+            break
+
+    print(f"OpenAlex keşif: {len(new_dois)} yeni DOI bulundu (mevcut {len(existing_dois)} kayıtla karşılaştırıldı).")
+    return new_dois
+
+
+def fetch_scopus_by_doi(doi: str) -> dict | None:
+  
+    if not ENABLE_SCOPUS_FETCH:
+        print(f"[KAPALI] Scopus isteği atlandı: {doi}")
+        return None
+
+    headers = {"X-ELS-APIKey": SCP_API_KEY, "Accept": "application/json"}
+    params = {"view": "COMPLETE"}
+    resp = requests.get(f"{SCOPUS_BASE_URL}/{doi}", headers=headers, params=params)
+    if resp.status_code != 200:
+        print(f"Scopus hatası ({doi}): {resp.status_code} - {resp.text}")
+        return None
+    return resp.json()
+
+
+def sync_scopus_data(db: Session):
+    """Hibrit akış: OpenAlex keşif + Scopus nokta-atışı doğrulama."""
+    new_dois = get_new_dois_from_openalex(db)
+
+    if not new_dois:
+        print("Yeni DOI yok, senkronizasyon tamamlandı.")
+        return
+
+    total_processed = 0
+    for doi in new_dois:
+        scopus_data = fetch_scopus_by_doi(doi)
+        if scopus_data is None:
+            continue  
+        
+        entry = scopus_data.get("abstracts-retrieval-response", {}).get("coredata", {})
+
+        total_processed += 1
+
+    print(f"Senkronizasyon tamamlandı: {total_processed} yeni makale işlendi (ENABLE_SCOPUS_FETCH={ENABLE_SCOPUS_FETCH}).")
+

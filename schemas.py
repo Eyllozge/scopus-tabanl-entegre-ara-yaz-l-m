@@ -18,6 +18,7 @@ class InstitutionResponse(BaseModel):
 
 # 3. Ana Makale Şeması 
 class ArticleResponse(BaseModel):
+    id : int
     scopus_id: str
     art_name: str
     publication_name: Optional[str]
