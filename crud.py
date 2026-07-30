@@ -22,34 +22,25 @@ def get_or_create_institution(db: Session, name: str):
     return institution
 
 def upsert_article(
-    db: Session, 
-    scopus_id: str, 
-    art_name: str, 
-    publication_name: str, 
-    cover_date, 
-    doi: str, 
-    citedby_count: int, 
-    author_objs: list, 
-    institution_objs: list
+    db: Session, scopus_id: str, art_name: str, publication_name: str,
+    cover_date, doi: str, citedby_count: int,
+    author_objs: list, institution_objs: list,
+    abstract: str = None, keywords: str = None
 ):
-
     article = db.query(Article).filter(Article.scopus_id == scopus_id).first()
-    
     if article:
         article.citedby_count = citedby_count
+        article.abstract = abstract or article.abstract
+        article.keywords = keywords or article.keywords
     else:
         article = Article(
-            scopus_id=scopus_id,
-            art_name=art_name,
-            publication_name=publication_name,
-            cover_date=cover_date,
-            doi=doi,
-            citedby_count=citedby_count
+            scopus_id=scopus_id, art_name=art_name, publication_name=publication_name,
+            cover_date=cover_date, doi=doi, citedby_count=citedby_count,
+            abstract=abstract, keywords=keywords
         )
         article.authors = author_objs
         article.institutions = institution_objs
         db.add(article)
-    
     db.commit()
     db.refresh(article)
     return article

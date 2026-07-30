@@ -13,6 +13,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 from database import SessionLocal 
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime, timedelta
 
 
 def scheduled_scopus_sync():
@@ -85,18 +86,29 @@ def trigger_scopus_sync(db: Session = Depends(get_db)):
         
 @app.get("/api/stats/summary")
 def get_summary_stats(db: Session = Depends(get_db)):
-    #Dashboard için genel özet istatistikleri döndürür.
-
-    # Toplam makale sayısı
     total_articles = db.query(Article).count()
-    
-    # Tüm makalelerin atıf sayılarının toplamı
     total_citations = db.query(func.sum(Article.citedby_count)).scalar() or 0
-    
+
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_articles = db.query(Article).filter(Article.created_at >= thirty_days_ago).count()
+
     return {
         "total_articles": total_articles,
-        "total_citations": total_citations
+        "total_citations": total_citations,
+        "recent_articles_30_days": recent_articles
     }
+    
+@app.get("/api/articles/{article_id}", response_model=schemas.ArticleResponse)
+def get_article_detail(article_id: int, db: Session = Depends(get_db)):
+    article = (
+        db.query(Article)
+        .options(joinedload(Article.authors), joinedload(Article.institutions))
+        .filter(Article.id == article_id)
+        .first()
+    )
+    if not article:
+        raise HTTPException(status_code=404, detail="Makale bulunamadı")
+    return article
     
 @app.get("/api/stats/top-authors")
 def get_top_authors(limit: int = 5, db: Session = Depends(get_db)):
