@@ -23,10 +23,9 @@ class ArticleResponse(BaseModel):
     publication_name: Optional[str]
     cover_date: Optional[date]
     citedby_count: int
-    
-    # SQLAlchemy'deki 'authors' ve 'institutions' ilişkileri
+    abstract: Optional[str] = None
+    keywords: Optional[str] = None
     authors: List[AuthorResponse] = []
     institutions: List[InstitutionResponse] = []
-
     class Config:
         from_attributes = True

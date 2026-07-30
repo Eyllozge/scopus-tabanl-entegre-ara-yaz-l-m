@@ -1,5 +1,7 @@
 from sqlalchemy import Column, Integer, String, Date, ForeignKey, Table
 from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Table
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -25,9 +27,13 @@ class Article(Base):
     cover_date = Column(Date)
     doi = Column(String, unique=True, nullable=True) 
     citedby_count = Column(Integer, default=0) 
+    created_at = Column(DateTime(timezone=True), server_default=func.now()) 
+    abstract = Column(Text, nullable=True)
+    keywords = Column(String, nullable=True)
     
     authors = relationship("Author", secondary=article_author_association, back_populates="articles")
     institutions = relationship("Institution", secondary=article_institution_association, back_populates="articles")
+    
 
 class Author(Base):
     __tablename__ = 'authors'
