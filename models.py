@@ -1,4 +1,3 @@
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Table
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Table
 from sqlalchemy.sql import func

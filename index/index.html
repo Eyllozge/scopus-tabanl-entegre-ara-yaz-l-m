@@ -25,6 +25,22 @@
     </div>
   </header>
 
+  <section class="dashboard-cards">
+  <div class="stat-card"><span id="statTotalArticles">–</span><label>Toplam Makale</label></div>
+  <div class="stat-card"><span id="statTotalCitations">–</span><label>Toplam Atıf</label></div>
+  <div class="stat-card"><span id="statRecent">–</span><label>Son 30 Gün</label></div>
+</section>
+
+<div id="articleModal" class="modal">
+  <div class="modal-box">
+    <button id="modalClose" class="modal-close">&times;</button>
+    <h2 class="modal-title"></h2>
+    <p class="modal-journal"></p>
+    <p class="modal-authors"></p>
+    <p class="modal-abstract"></p>
+  </div>
+</div>
+
   <div class="content">
   <section class="search-panel">
     <div class="search-row">
@@ -78,10 +94,6 @@ minCitations.addEventListener('input', () => {
   minCitationsValue.textContent = minCitations.value + (minCitations.value === minCitations.max ? '+' : '');
 });
 
-function getScopusUrl(scopusId) {
-  const eid = String(scopusId).startsWith('2-s2.0-') ? scopusId : `2-s2.0-${scopusId}`;
-  return `https://www.scopus.com/record/display.uri?eid=${eid}&origin=resultslist`;
-}
 
 function showEmpty(message, isError = false) {
   resultsMeta.textContent = '';
@@ -93,25 +105,53 @@ function renderResults(articles) {
 
   const maxCitations = Math.max(...articles.map(a => a.citedby_count), 1);
 
-  resultsArea.innerHTML = articles.map(article => {
-    const authorsList = article.authors.map(a => a.auth_fullname).join(', ') || 'Yazar bilgisi yok';
-    const scopusLink = getScopusUrl(article.scopus_id);
-    const pct = Math.min(article.citedby_count / maxCitations, 1).toFixed(3);
-
-    return `
-      <div class="result-item">
-        <div class="seal-badge" style="--pct:${pct}">
-          <span>${article.citedby_count}</span>
-        </div>
-        <div class="result-body">
-          <a href="${scopusLink}" target="_blank" rel="noopener" class="article-title">${article.art_name}</a>
-          <div class="article-authors">${authorsList}</div>
-          <div class="article-meta">${article.publication_name || 'Dergi bilgisi yok'}</div>
-        </div>
+resultsArea.innerHTML = articles.map(article => {
+  const authorsList = article.authors.map(a => a.auth_fullname).join(', ') || 'Yazar bilgisi yok';
+  const pct = Math.min(article.citedby_count / maxCitations, 1).toFixed(3);
+  return `
+    <div class="result-item">
+      <div class="seal-badge" style="--pct:${pct}"><span>${article.citedby_count}</span></div>
+      <div class="result-body">
+        <a href="#" class="article-title" data-id="${article.id}">${article.art_name}</a>
+        <div class="article-authors">${authorsList}</div>
+        <div class="article-meta">${article.publication_name || 'Dergi bilgisi yok'}</div>
       </div>
-    `;
-  }).join('');
+    </div>
+  `;
+}).join('');
+
+document.querySelectorAll('.article-title').forEach(el => {
+  el.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const id = e.target.dataset.id;
+    const res = await fetch(`${API_BASE_URL}/api/articles/${id}`);
+    const data = await res.json();
+    openArticleModal(data);
+  });
+});
+
 }
+
+function openArticleModal(article) {
+  const modal = document.getElementById('articleModal');
+  modal.querySelector('.modal-title').textContent = article.art_name;
+  modal.querySelector('.modal-journal').textContent = article.publication_name || '';
+  modal.querySelector('.modal-abstract').textContent = article.abstract || 'Özet bulunamadı.';
+  modal.querySelector('.modal-authors').textContent = article.authors.map(a => a.auth_fullname).join(', ');
+  modal.classList.add('open');
+}
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('articleModal').classList.remove('open');
+});
+
+async function loadDashboard() {
+  const res = await fetch(`${API_BASE_URL}/api/stats/summary`);
+  const stats = await res.json();
+  document.getElementById('statTotalArticles').textContent = stats.total_articles;
+  document.getElementById('statTotalCitations').textContent = stats.total_citations;
+  document.getElementById('statRecent').textContent = stats.recent_articles_30_days;
+}
+loadDashboard();
 
 async function runSearch() {
   const query = searchInput.value.trim().toLowerCase();
