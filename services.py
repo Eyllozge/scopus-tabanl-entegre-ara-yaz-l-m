@@ -82,6 +82,17 @@ def _is_firat_name(name: str) -> bool:
     if not name:
         return False
 
+    normalized = (
+        name.lower()
+        .replace("ı", "i")
+        .replace("ü", "u")
+        .replace("ö", "o")
+        .replace("ş", "s")
+        .replace("ç", "c")
+        .replace("ğ", "g")
+    )
+    return "firat" in normalized
+
 def _has_firat_affiliation(entry: dict) -> bool:
     #Scopus arama sonucundaki affiliation bloğunda gerçek bir Fırat üni eşleşmesi var mı (New jersey ya da suudi arabistan verileri gelmesin)
     affil_block = entry.get("affiliation", [])
