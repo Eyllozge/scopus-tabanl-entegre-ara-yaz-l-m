@@ -79,7 +79,8 @@
 </div>
 
 <script>
-const API_BASE_URL = "https://scopus-tabanl-entegre-ara-yaz-l-m-1.onrender.com";
+// Lokal geliştirme için local IP; canlıya alırken Render URL'ini buraya yazarsın.
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 const searchBtn = document.getElementById('searchBtn');
 const searchInput = document.getElementById('searchInput');
@@ -94,7 +95,6 @@ minCitations.addEventListener('input', () => {
   minCitationsValue.textContent = minCitations.value + (minCitations.value === minCitations.max ? '+' : '');
 });
 
-
 function showEmpty(message, isError = false) {
   resultsMeta.textContent = '';
   resultsArea.innerHTML = `<div class="empty-state${isError ? ' error' : ''}">${message}</div>`;
@@ -105,31 +105,34 @@ function renderResults(articles) {
 
   const maxCitations = Math.max(...articles.map(a => a.citedby_count), 1);
 
-resultsArea.innerHTML = articles.map(article => {
-  const authorsList = article.authors.map(a => a.auth_fullname).join(', ') || 'Yazar bilgisi yok';
-  const pct = Math.min(article.citedby_count / maxCitations, 1).toFixed(3);
-  return `
-    <div class="result-item">
-      <div class="seal-badge" style="--pct:${pct}"><span>${article.citedby_count}</span></div>
-      <div class="result-body">
-        <a href="#" class="article-title" data-id="${article.id}">${article.art_name}</a>
-        <div class="article-authors">${authorsList}</div>
-        <div class="article-meta">${article.publication_name || 'Dergi bilgisi yok'}</div>
+  resultsArea.innerHTML = articles.map(article => {
+    const authorsList = article.authors ? article.authors.map(a => a.auth_fullname).join(', ') : 'Yazar bilgisi yok';
+    const pct = Math.min(article.citedby_count / maxCitations, 1).toFixed(3);
+    return `
+      <div class="result-item">
+        <div class="seal-badge" style="--pct:${pct}"><span>${article.citedby_count}</span></div>
+        <div class="result-body">
+          <a href="#" class="article-title" data-id="${article.id}">${article.art_name}</a>
+          <div class="article-authors">${authorsList}</div>
+          <div class="article-meta">${article.publication_name || 'Dergi bilgisi yok'}</div>
+        </div>
       </div>
-    </div>
-  `;
-}).join('');
+    `;
+  }).join('');
 
-document.querySelectorAll('.article-title').forEach(el => {
-  el.addEventListener('click', async (e) => {
-    e.preventDefault();
-    const id = e.target.dataset.id;
-    const res = await fetch(`${API_BASE_URL}/api/articles/${id}`);
-    const data = await res.json();
-    openArticleModal(data);
+  document.querySelectorAll('.article-title').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const id = e.target.dataset.id;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/articles/${id}`);
+        const data = await res.json();
+        openArticleModal(data);
+      } catch (err) {
+        alert("Makale detayları alınamadı.");
+      }
+    });
   });
-});
-
 }
 
 function openArticleModal(article) {
@@ -137,19 +140,25 @@ function openArticleModal(article) {
   modal.querySelector('.modal-title').textContent = article.art_name;
   modal.querySelector('.modal-journal').textContent = article.publication_name || '';
   modal.querySelector('.modal-abstract').textContent = article.abstract || 'Özet bulunamadı.';
-  modal.querySelector('.modal-authors').textContent = article.authors.map(a => a.auth_fullname).join(', ');
+  modal.querySelector('.modal-authors').textContent = article.authors ? article.authors.map(a => a.auth_fullname).join(', ') : '';
   modal.classList.add('open');
 }
+
 document.getElementById('modalClose').addEventListener('click', () => {
   document.getElementById('articleModal').classList.remove('open');
 });
 
 async function loadDashboard() {
-  const res = await fetch(`${API_BASE_URL}/api/stats/summary`);
-  const stats = await res.json();
-  document.getElementById('statTotalArticles').textContent = stats.total_articles;
-  document.getElementById('statTotalCitations').textContent = stats.total_citations;
-  document.getElementById('statRecent').textContent = stats.recent_articles_30_days;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/stats/summary`);
+    if (!res.ok) throw new Error("Dashboard yüklenemedi");
+    const stats = await res.json();
+    document.getElementById('statTotalArticles').textContent = stats.total_articles;
+    document.getElementById('statTotalCitations').textContent = stats.total_citations;
+    document.getElementById('statRecent').textContent = stats.recent_articles_30_days;
+  } catch (error) {
+    console.warn("Dashboard verileri alınırken hata oluştu:", error);
+  }
 }
 loadDashboard();
 
@@ -164,16 +173,30 @@ async function runSearch() {
   showEmpty('Makaleler taranıyor…');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/articles?limit=300`);
+    
+    let url = `${API_BASE_URL}/api/articles?limit=50`;
+    
+    if (sortCitations.checked) {
+      url += `&sort_by_citations=true`;
+    }
+
+    if (searchType.value === 'journal') {
+      url += `&journal=${encodeURIComponent(query)}`;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Arama isteği başarısız oldu.");
+
     const data = await response.json();
 
     const filterType = searchType.value;
     const minCount = Number(minCitations.value);
 
+    // İstemci tarafı filtreleme mantığı
     let filtered = data.filter(article => {
-      const titleMatch = article.art_name.toLowerCase().includes(query);
-      const journalMatch = article.publication_name && article.publication_name.toLowerCase().includes(query);
-      const authorsList = article.authors.map(a => a.auth_fullname.toLowerCase()).join(' ');
+      const titleMatch = article.art_name ? article.art_name.toLowerCase().includes(query) : false;
+      const journalMatch = article.publication_name ? article.publication_name.toLowerCase().includes(query) : false;
+      const authorsList = article.authors ? article.authors.map(a => a.auth_fullname.toLowerCase()).join(' ') : '';
       const authorMatch = authorsList.includes(query);
 
       let matchesQuery;
@@ -185,10 +208,6 @@ async function runSearch() {
       return matchesQuery && article.citedby_count >= minCount;
     });
 
-    if (sortCitations.checked) {
-      filtered.sort((a, b) => b.citedby_count - a.citedby_count);
-    }
-
     if (filtered.length === 0) {
       showEmpty('Belirttiğiniz filtreye ve arama terimine uygun makale bulunamadı.');
       return;
@@ -197,6 +216,7 @@ async function runSearch() {
     renderResults(filtered);
 
   } catch (error) {
+    console.error(error);
     showEmpty('Sunucuya bağlanılamadı. API hizmetinin çalıştığından emin olun.', true);
   }
 }
@@ -209,5 +229,3 @@ searchInput.addEventListener('keypress', event => {
   }
 });
 </script>
-</body>
-</html>
