@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 def scheduled_scopus_sync():
     print("Otomatik Scopus senkronizasyonu başlatılıyor...")
-    db = SessionLocal()  # FastAPI dışında çalıştığı için db session açılacak
+    db = SessionLocal()  # FastAPI dışında çalıştığı için db session açılmalı.
     try:
         services.sync_scopus_data(db)
     finally:
@@ -54,7 +54,7 @@ app.add_middleware(
 
 
 def _apply_period_filter(query, year: Optional[int], month: Optional[int]):
-    #cover_date üzerinden ay/yıl filtresi uygulaması
+    #Makaleler için ay ve yıl filtresi
     if year:
         query = query.filter(extract("year", Article.cover_date) == year)
     if month:
@@ -94,11 +94,20 @@ def get_articles(
 
 
 @app.post("/api/sync")
-def trigger_scopus_sync(db: Session = Depends(get_db)):
-    services.sync_scopus_data(db)
+def trigger_scopus_sync(
+    full_backfill: bool = False,
+    force: bool = False,
+    db: Session = Depends(get_db)
+):
+    """!!!!!
+    force=False (varsayılan): son senkron 30 günden yeniyse Scopus'a hiç
+    istek atılmaz, DB'deki veri geçerli kabul edilir.
+    force=True: freshness kontrolünü atlayıp Scopus'a yine de gider.
+    """
+    services.sync_scopus_data(db, full_backfill=full_backfill, force=force)
     return {
         "status": "success",
-        "message": "Veriler başarıyla çekildi ve veritabanına işlendi."
+        "message": "Senkronizasyon tetiklendi (freshness kontrolü)."
     }
 
 
@@ -108,11 +117,7 @@ def get_summary_stats(
     month: Optional[int] = Query(None, ge=1, le=12),
     db: Session = Depends(get_db)
 ):
-    
-    # Ana ekran kartları için: toplam makale, toplam atıf, katkı sağlayan
-    # akademisyen sayısı. year/month verilirse o döneme göre hesaplanır,
-    # verilmezse tüm zamanlar.
-    
+    #Ana ekran kartları için istatistik
     article_query = _apply_period_filter(db.query(Article), year, month)
 
     total_articles = article_query.count()
@@ -142,7 +147,7 @@ def get_authors_by_period(
     month: Optional[int] = Query(None, ge=1, le=12),
     db: Session = Depends(get_db)
 ):
-    #Yıla bağlı ama ay da alabilen ana ekranda çıkacak filtre
+    # Makaleleri belirtilen yıl ve ayda yayınlanan yazarları listeler, makale sayısına göre sıralar.
     query = (
         db.query(
             Author.auth_fullname,
