@@ -3,124 +3,232 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Akademik Atıf Dizini</title>
+<title>Akademik Atıf Dizini | Fırat Üniversitesi</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="page">
+  <!-- Kurumsal Üst Şerit -->
+  <div class="corporate-topbar"></div>
 
-  <header class="masthead">
-    <svg class="seal" viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="1.4"/>
-      <circle cx="32" cy="32" r="23" fill="none" stroke="currentColor" stroke-width="1.4"/>
-      <circle cx="32" cy="32" r="4" fill="currentColor"/>
-    </svg>
-    <div class="masthead-text">
-      <h1>Akademik Atıf Dizini</h1>
-      <p class="eyebrow">Fırat Üniversitesi · Scopus Tabanlı Yayın Arşivi</p>
-    </div>
-  </header>
+  <div class="page">
+    <header class="masthead">
+      <div class="masthead-brand">
+        <!-- Kurumsal logo hissi veren ikon -->
+        <svg class="seal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+          <path d="M8 7h6"/>
+          <path d="M8 11h8"/>
+        </svg>
+        <div class="masthead-text">
+          <h1>Akademik Atıf Dizini</h1>
+          <p class="eyebrow">Fırat Üniversitesi · Scopus Tabanlı Yayın Arşivi</p>
+        </div>
+      </div>
+    </header>
 
-  <section class="dashboard-cards">
-  <div class="stat-card"><span id="statTotalArticles">–</span><label>Toplam Makale</label></div>
-  <div class="stat-card"><span id="statTotalCitations">–</span><label>Toplam Atıf</label></div>
-  <div class="stat-card"><span id="statRecent">–</span><label>Son 30 Gün</label></div>
-</section>
+    <section class="dashboard-cards">
+      <div class="stat-card">
+        <label>Toplam Makale</label>
+        <span id="statTotalArticles">–</span>
+      </div>
+      <div class="stat-card">
+        <label>Toplam Atıf</label>
+        <span id="statTotalCitations">–</span>
+      </div>
+      <div class="stat-card">
+        <label>Son 30 Gün</label>
+        <span id="statRecent">–</span>
+      </div>
+    </section>
 
-<div id="articleModal" class="modal">
-  <div class="modal-box">
-    <button id="modalClose" class="modal-close">&times;</button>
-    <h2 class="modal-title"></h2>
-    <p class="modal-journal"></p>
-    <p class="modal-authors"></p>
-    <p class="modal-abstract"></p>
-  </div>
-</div>
-
-  <div class="content">
-  <section class="search-panel">
-    <div class="search-row">
-      <select id="searchType" class="field-select" aria-label="Arama alanı">
-        <option value="all">Tüm Alanlar</option>
-        <option value="title">Makale Adı</option>
-        <option value="author">Yazar</option>
-        <option value="journal">Dergi Adı</option>
-      </select>
-      <input type="text" id="searchInput" class="field-input" placeholder="Aramak istediğiniz terimi girin…">
-      <button id="searchBtn" class="btn-primary">Ara</button>
-    </div>
-
-    <div class="filter-row">
-      <label class="switch">
-        <input type="checkbox" id="sortCitations">
-        <span class="switch-track"><span class="switch-thumb"></span></span>
-        <span class="switch-label">Atıfa göre sırala</span>
-      </label>
-
-      <label class="switch">
-       <input type="checkbox" id="onlyFirat" checked>
-       <span class="switch-track"><span class="switch-thumb"></span></span>
-       <span class="switch-label">Sadece Fırat Üni. Yayınları</span>
-</label>
-
-      <div class="slider-group">
-        <label for="minCitations">En az atıf<span id="minCitationsValue" class="slider-value">0</span></label>
-        <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
+    <div id="articleModal" class="modal">
+      <div class="modal-box">
+        <button id="modalClose" class="modal-close" aria-label="Kapat">&times;</button>
+        <div class="modal-title-row">
+          <h2 class="modal-title"></h2>
+          <a class="modal-scopus-link" href="#" target="_blank" rel="noopener noreferrer" title="Kaynağa git (DOI)" aria-label="Kaynağa git (DOI)" style="display:none;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 17L17 7"/>
+              <path d="M8 7h9v9"/>
+            </svg>
+          </a>
+        </div>
+        <p class="modal-journal"></p>
+        <p class="modal-citation"></p>
+        <p class="modal-authors"></p>
+        <p class="modal-abstract"></p>
+        <p class="modal-keywords"></p>
       </div>
     </div>
-  </section>
 
-  <section class="results">
-    <div id="resultsMeta" class="results-meta" role="status"></div>
-    <div id="resultsArea" class="results-list">
-      <div class="empty-state">Aramaya başlamak için bir anahtar kelime girin.</div>
+    <div class="content">
+      <section class="search-panel">
+        <div class="search-row">
+          <select id="searchType" class="field-select" aria-label="Arama alanı">
+            <option value="all">Tüm Alanlar</option>
+            <option value="title">Makale Adı</option>
+            <option value="author">Yazar</option>
+            <option value="journal">Dergi Adı</option>
+          </select>
+          <input type="text" id="searchInput" class="field-input" placeholder="Aramak istediğiniz terimi girin…">
+          <button id="searchBtn" class="btn-primary">Ara</button>
+        </div>
+
+        <div class="filter-row">
+          <label class="switch">
+            <input type="checkbox" id="sortCitations">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Atıfa göre sırala</span>
+          </label>
+
+          <label class="switch">
+            <input type="checkbox" id="onlyFirat" checked>
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Sadece Fırat Üni. Yayınları</span>
+          </label>
+
+          <div class="slider-group">
+            <label for="minCitations">En az atıf: <span id="minCitationsValue" class="slider-value">0</span></label>
+            <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
+          </div>
+
+          <div class="period-group">
+            <label for="filterYear">Yıl</label>
+            <select id="filterYear" class="field-select small-select">
+              <option value="">Tümü</option>
+            </select>
+
+            <label for="filterMonth">Ay</label>
+            <select id="filterMonth" class="field-select small-select">
+              <option value="">Tümü</option>
+              <option value="1">Ocak</option>
+              <option value="2">Şubat</option>
+              <option value="3">Mart</option>
+              <option value="4">Nisan</option>
+              <option value="5">Mayıs</option>
+              <option value="6">Haziran</option>
+              <option value="7">Temmuz</option>
+              <option value="8">Ağustos</option>
+              <option value="9">Eylül</option>
+              <option value="10">Ekim</option>
+              <option value="11">Kasım</option>
+              <option value="12">Aralık</option>
+            </select>
+          </div>
+
+          <button id="resetBtn" class="btn-secondary" type="button">Filtreleri Temizle</button>
+        </div>
+      </section>
+
+      <section class="results">
+        <div id="resultsMeta" class="results-meta" role="status"></div>
+        <div id="resultsArea" class="results-list">
+          <div class="empty-state">Aramaya başlamak için bir anahtar kelime girin.</div>
+        </div>
+      </section>
     </div>
-  </section>
   </div>
-
-</div>
 
 <script>
 const API_BASE_URL = "http://127.0.0.1:8000";
+const CURRENT_YEAR = new Date().getFullYear();
+const MIN_YEAR = 1990;
 
 const searchBtn = document.getElementById('searchBtn');
 const searchInput = document.getElementById('searchInput');
 const searchType = document.getElementById('searchType');
 const sortCitations = document.getElementById('sortCitations');
-const onlyFirat = document.getElementById('onlyFirat'); 
+const onlyFirat = document.getElementById('onlyFirat');
 const minCitations = document.getElementById('minCitations');
 const minCitationsValue = document.getElementById('minCitationsValue');
+const filterYear = document.getElementById('filterYear');
+const filterMonth = document.getElementById('filterMonth');
+const resetBtn = document.getElementById('resetBtn');
 const resultsArea = document.getElementById('resultsArea');
 const resultsMeta = document.getElementById('resultsMeta');
+
+// Yıl dropdown'unu doldur
+(function populateYears() {
+  for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    filterYear.appendChild(opt);
+  }
+})();
 
 minCitations.addEventListener('input', () => {
   minCitationsValue.textContent = minCitations.value + (minCitations.value === minCitations.max ? '+' : '');
 });
+
+resetBtn.addEventListener('click', () => {
+  searchInput.value = '';
+  searchType.value = 'all';
+  sortCitations.checked = false;
+  onlyFirat.checked = true;
+  minCitations.value = 0;
+  minCitationsValue.textContent = '0';
+  filterYear.value = '';
+  filterMonth.value = '';
+  showEmpty('Aramaya başlamak için bir anahtar kelime girin.');
+});
+
+function trLower(str) {
+  return (str || '').toLocaleLowerCase('tr-TR');
+}
 
 function showEmpty(message, isError = false) {
   resultsMeta.textContent = '';
   resultsArea.innerHTML = `<div class="empty-state${isError ? ' error' : ''}">${message}</div>`;
 }
 
+function formatCoverDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.getFullYear();
+}
+
+// Bir makalenin DOI'sinden kaynağa (yayıncı sayfasına) giden URL'yi üretir.
+// Not: Scopus'un inward/record.uri linki eid+partnerID gerektiriyor (sadece
+// doi ile "Scopus is unable to process your request" hatası veriyor); elimizde
+// eid olmadığından DOI çözücü (doi.org) üzerinden orijinal kaynağa yönlendiriyoruz.
+// DOI yoksa null döner (link gösterilmez).
+function buildScopusUrl(article) {
+  if (article && article.doi) {
+    return `https://doi.org/${encodeURIComponent(article.doi)}`;
+  }
+  return null;
+}
+
 function renderResults(articles) {
   resultsMeta.innerHTML = `<strong>${articles.length}</strong> sonuç bulundu`;
 
-  const maxCitations = Math.max(...articles.map(a => a.citedby_count), 1);
+  const citCounts = articles.map(a => Number(a.citedby_count) || 0);
+  const maxCitations = citCounts.length ? Math.max(...citCounts, 1) : 1;
 
   resultsArea.innerHTML = articles.map(article => {
-    const authorsList = article.authors ? article.authors.map(a => a.auth_fullname).join(', ') : 'Yazar bilgisi yok';
-    const pct = Math.min(article.citedby_count / maxCitations, 1).toFixed(3);
+    const authorsList = article.authors
+      ? article.authors.map(a => a.auth_fullname).join(', ')
+      : 'Yazar bilgisi yok';
+    const count = Number(article.citedby_count) || 0;
+    const pct = Math.min(count / maxCitations, 1).toFixed(3);
+    const year = formatCoverDate(article.cover_date);
+    const metaLine = [article.publication_name || 'Dergi bilgisi yok', year].filter(Boolean).join(' · ');
     return `
       <div class="result-item">
-        <div class="seal-badge" style="--pct:${pct}"><span>${article.citedby_count}</span></div>
+        <div class="seal-badge" style="--pct:${pct}">
+          <span class="badge-label">Atıf</span>
+          <span class="badge-count">${count}</span>
+        </div>
         <div class="result-body">
           <a href="#" class="article-title" data-id="${article.id}">${article.art_name}</a>
           <div class="article-authors">${authorsList}</div>
-          <div class="article-meta">${article.publication_name || 'Dergi bilgisi yok'}</div>
+          <div class="article-meta">${metaLine}</div>
         </div>
       </div>
     `;
@@ -132,6 +240,7 @@ function renderResults(articles) {
       const id = e.target.dataset.id;
       try {
         const res = await fetch(`${API_BASE_URL}/api/articles/${id}`);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         openArticleModal(data);
       } catch (err) {
@@ -145,13 +254,53 @@ function openArticleModal(article) {
   const modal = document.getElementById('articleModal');
   modal.querySelector('.modal-title').textContent = article.art_name;
   modal.querySelector('.modal-journal').textContent = article.publication_name || '';
-  modal.querySelector('.modal-abstract').textContent = article.abstract || 'Özet bulunamadı.';
-  modal.querySelector('.modal-authors').textContent = article.authors ? article.authors.map(a => a.auth_fullname).join(', ') : '';
+
+  const year = formatCoverDate(article.cover_date);
+  const citationParts = [];
+  if (year) citationParts.push(year);
+  if (article.doi) citationParts.push(`DOI: ${article.doi}`);
+  citationParts.push(`${article.citedby_count ?? 0} atıf`);
+  modal.querySelector('.modal-citation').textContent = citationParts.join(' · ');
+
+  modal.querySelector('.modal-authors').textContent = article.authors
+    ? article.authors.map(a => a.auth_fullname).join(', ')
+    : '';
+
+  modal.querySelector('.modal-abstract').textContent =
+    article.abstract || 'Bu makale için özet bilgisi mevcut değil.';
+
+  const keywordsEl = modal.querySelector('.modal-keywords');
+  if (article.keywords) {
+    keywordsEl.textContent = 'Anahtar Kelimeler: ' + article.keywords;
+    keywordsEl.style.display = '';
+  } else {
+    keywordsEl.style.display = 'none';
+  }
+
+  // Makalenin DOI'sine göre Scopus'a yönlendiren ok ikonunu göster/gizle
+  const scopusLink = modal.querySelector('.modal-scopus-link');
+  const scopusUrl = buildScopusUrl(article);
+  if (scopusUrl) {
+    scopusLink.href = scopusUrl;
+    scopusLink.style.display = '';
+  } else {
+    scopusLink.removeAttribute('href');
+    scopusLink.style.display = 'none';
+  }
+
   modal.classList.add('open');
 }
 
-document.getElementById('modalClose').addEventListener('click', () => {
+function closeModal() {
   document.getElementById('articleModal').classList.remove('open');
+}
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('articleModal').addEventListener('click', (e) => {
+  if (e.target.id === 'articleModal') closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
 });
 
 async function loadDashboard() {
@@ -169,7 +318,8 @@ async function loadDashboard() {
 loadDashboard();
 
 async function runSearch() {
-  const query = searchInput.value.trim().toLowerCase();
+  const rawQuery = searchInput.value.trim();
+  const query = trLower(rawQuery);
 
   if (!query) {
     showEmpty('Lütfen aramak için bir kelime girin.', true);
@@ -177,36 +327,33 @@ async function runSearch() {
   }
 
   showEmpty('Makaleler taranıyor…');
+  searchBtn.disabled = true;
 
   try {
-    
-    let url = `${API_BASE_URL}/api/articles?limit=50`;
-    
-    if (sortCitations.checked) {
-      url += `&sort_by_citations=true`;
-    }
+    let url = `${API_BASE_URL}/api/articles?limit=200`;
 
-    if (onlyFirat && onlyFirat.checked) {
-      url += `&only_firat=true`;
-    }
+    if (sortCitations.checked) url += `&sort_by_citations=true`;
+    if (onlyFirat && onlyFirat.checked) url += `&only_firat=true`;
+    if (filterYear.value) url += `&year=${filterYear.value}`;
+    if (filterMonth.value) url += `&month=${filterMonth.value}`;
 
-    if (searchType.value === 'journal') {
-      url += `&journal=${encodeURIComponent(query)}`;
+    const filterType = searchType.value;
+    if (filterType === 'journal') {
+      url += `&journal=${encodeURIComponent(rawQuery)}`;
     }
 
     const response = await fetch(url);
     if (!response.ok) throw new Error("Arama isteği başarısız oldu.");
 
     const data = await response.json();
-
-    const filterType = searchType.value;
     const minCount = Number(minCitations.value);
 
-    // İstemci tarafı filtreleme mantığı
-    let filtered = data.filter(article => {
-      const titleMatch = article.art_name ? article.art_name.toLowerCase().includes(query) : false;
-      const journalMatch = article.publication_name ? article.publication_name.toLowerCase().includes(query) : false;
-      const authorsList = article.authors ? article.authors.map(a => a.auth_fullname.toLowerCase()).join(' ') : '';
+    const filtered = data.filter(article => {
+      const titleMatch = trLower(article.art_name).includes(query);
+      const journalMatch = trLower(article.publication_name).includes(query);
+      const authorsList = article.authors
+        ? article.authors.map(a => trLower(a.auth_fullname)).join(' ')
+        : '';
       const authorMatch = authorsList.includes(query);
 
       let matchesQuery;
@@ -215,7 +362,7 @@ async function runSearch() {
       else if (filterType === 'journal') matchesQuery = journalMatch;
       else matchesQuery = titleMatch || journalMatch || authorMatch;
 
-      return matchesQuery && article.citedby_count >= minCount;
+      return matchesQuery && (Number(article.citedby_count) || 0) >= minCount;
     });
 
     if (filtered.length === 0) {
@@ -228,6 +375,8 @@ async function runSearch() {
   } catch (error) {
     console.error(error);
     showEmpty('Sunucuya bağlanılamadı. API hizmetinin çalıştığından emin olun.', true);
+  } finally {
+    searchBtn.disabled = false;
   }
 }
 
@@ -239,3 +388,5 @@ searchInput.addEventListener('keypress', event => {
   }
 });
 </script>
+</body>
+</html>
