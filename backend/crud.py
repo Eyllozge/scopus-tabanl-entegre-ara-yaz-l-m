@@ -1,12 +1,11 @@
-from sqlalchemy.orm import Session
-from models import Article, Author, Institution, SyncLog
-from models import Faculty, Academic
-
+import re
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session, joinedload
+from models import Article, Author, Faculty, Academic, Institution, SyncLog
 
 
 def get_or_create_author(db: Session, full_name: str, scopus_author_id: str = None, is_firat_academic: bool = False):
     author = None
-
     if scopus_author_id:
         author = db.query(Author).filter(Author.scopus_author_id == scopus_author_id).first()
 
@@ -30,7 +29,6 @@ def get_or_create_institution(
     db: Session, name: str, scopus_affiliation_id: str = None, unit: str = None, is_firat: bool = False
 ):
     institution = None
-
     if scopus_affiliation_id:
         institution = db.query(Institution).filter(
             Institution.scopus_affiliation_id == scopus_affiliation_id
@@ -109,9 +107,6 @@ def get_last_sync(db: Session, source: str):
 
 
 def is_data_fresh(db: Session, source: str, days: int) -> bool:
-# şartlar sağlanıyorsa son başarılı senkrona göre önce local dbde arar
-    from datetime import datetime, timezone
-
     last_sync = get_last_sync(db, source)
     if not last_sync or last_sync.status != "success":
         return False
@@ -134,9 +129,11 @@ def get_or_create_faculty(db: Session, name: str, unit_type: str = None, source_
     return faculty
 
 
-def upsert_academic(db: Session, full_name: str, faculty_id: int, title: str = None,
-                     department: str = None, email: str = None, orcid: str = None,
-                     yok_author_id: str = None):
+def upsert_academic(
+    db: Session, full_name: str, faculty_id: int, title: str = None,
+    department: str = None, email: str = None, orcid: str = None,
+    yok_author_id: str = None
+):
     academic = db.query(Academic).filter(
         Academic.full_name == full_name, Academic.faculty_id == faculty_id
     ).first()
@@ -158,8 +155,6 @@ def upsert_academic(db: Session, full_name: str, faculty_id: int, title: str = N
 
 
 def match_academics_to_authors(db: Session):
-    import re
-
     def normalize(name: str) -> str:
         n = (name or "").lower()
         for a, b in [("ı", "i"), ("ü", "u"), ("ö", "o"), ("ş", "s"), ("ç", "c"), ("ğ", "g")]:
@@ -192,3 +187,56 @@ def match_academics_to_authors(db: Session):
     if skipped_duplicates:
         print(f"[BİLGİ] {skipped_duplicates} akademisyen zaten eşleşmiş bir yazara denk geldiği için atlandı.")
     return matched
+
+
+def search_academics(db: Session, query: str):
+    """Hoca ad veya soyadına göre (full_name üzerinden) arama yapar."""
+    return (
+        db.query(Academic)
+        .options(joinedload(Academic.faculty), joinedload(Academic.author))
+        .filter(Academic.full_name.ilike(f"%{query}%"))
+        .all()
+    )
+
+
+def get_academic_with_publications(db: Session, academic_id: int):
+    """Seçilen hocanın bilgilerini, fakültesini ve Author ilişkisi üzerinden Scopus makalelerini getirir."""
+    academic = (
+        db.query(Academic)
+        .options(joinedload(Academic.faculty), joinedload(Academic.author))
+        .filter(Academic.id == academic_id)
+        .first()
+    )
+
+    if not academic:
+        return None
+
+    articles = []
+    scopus_author_id = None
+
+    # Academic -> Author ilişkisi kontrolü
+    if academic.author:
+        scopus_author_id = academic.author.scopus_author_id
+        if hasattr(academic.author, "articles"):
+            articles = academic.author.articles
+
+    return {
+        "id": academic.id,
+        "name": academic.full_name,
+        "title": academic.title,
+        "department": academic.department,
+        "email": academic.email,
+        "scopus_author_id": scopus_author_id,
+        "faculty": academic.faculty.name if academic.faculty else "Belirtilmemiş",
+        "articles": [
+            {
+                "id": art.id,
+                "title": art.art_name,
+                "doi": art.doi,
+                "cover_date": str(art.cover_date) if art.cover_date else None,
+                "publication_name": art.publication_name,
+                "citation_count": art.citedby_count,
+            }
+            for art in articles
+        ],
+    }

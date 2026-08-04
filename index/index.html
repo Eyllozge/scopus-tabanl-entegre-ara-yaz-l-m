@@ -45,6 +45,7 @@
       </div>
     </section>
 
+    <!-- Makale Detay Modalı -->
     <div id="articleModal" class="modal">
       <div class="modal-box">
         <button id="modalClose" class="modal-close" aria-label="Kapat">&times;</button>
@@ -72,13 +73,14 @@
             <option value="all">Tüm Alanlar</option>
             <option value="title">Makale Adı</option>
             <option value="author">Yazar</option>
+            <option value="academic">Akademisyen / Fakülte</option>
             <option value="journal">Dergi Adı</option>
           </select>
           <input type="text" id="searchInput" class="field-input" placeholder="Aramak istediğiniz terimi girin…">
           <button id="searchBtn" class="btn-primary">Ara</button>
         </div>
 
-        <div class="filter-row">
+        <div class="filter-row" id="articleFiltersRow">
           <label class="switch">
             <input type="checkbox" id="sortCitations">
             <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -124,10 +126,28 @@
         </div>
       </section>
 
+      <!-- Arama Sonuç Alanı -->
       <section class="results">
         <div id="resultsMeta" class="results-meta" role="status"></div>
+        
+        <!-- Makale Listeleme Alanı -->
         <div id="resultsArea" class="results-list">
           <div class="empty-state">Aramaya başlamak için bir anahtar kelime girin.</div>
+        </div>
+
+        <!-- Akademisyen Listeleme Alanı (Arama türü 'academic' seçildiğinde açılır) -->
+        <div id="academicResultsArea" class="results-list" style="display: none;"></div>
+
+        <!-- Akademisyen Detay Paneli (Seçilen Akademisyenin Yayınları) -->
+        <div id="academicDetailPanel" class="modal-box" style="display: none; margin-top: 24px; width: 100%; border: 1px solid var(--border-color, #e2e8f0); background: #fff;">
+          <div class="modal-title-row">
+            <h2 id="academicDetailName" class="modal-title"></h2>
+          </div>
+          <p><strong>Fakülte:</strong> <span id="academicDetailFaculty" class="badge" style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 600;"></span></p>
+          <p style="margin-bottom: 16px;"><strong>Scopus Author ID:</strong> <span id="academicDetailScopusId"></span></p>
+
+          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 12px;">Scopus İndeksli Yayınlar</h3>
+          <div id="academicArticlesList" class="results-list"></div>
         </div>
       </section>
     </div>
@@ -149,7 +169,10 @@ const filterYear = document.getElementById('filterYear');
 const filterMonth = document.getElementById('filterMonth');
 const resetBtn = document.getElementById('resetBtn');
 const resultsArea = document.getElementById('resultsArea');
+const academicResultsArea = document.getElementById('academicResultsArea');
+const academicDetailPanel = document.getElementById('academicDetailPanel');
 const resultsMeta = document.getElementById('resultsMeta');
+const articleFiltersRow = document.getElementById('articleFiltersRow');
 
 // Yıl dropdown'unu doldur
 (function populateYears() {
@@ -161,6 +184,15 @@ const resultsMeta = document.getElementById('resultsMeta');
   }
 })();
 
+// Arama tipine göre filtre alanını gizle/göster
+searchType.addEventListener('change', () => {
+  if (searchType.value === 'academic') {
+    articleFiltersRow.style.display = 'none';
+  } else {
+    articleFiltersRow.style.display = 'flex';
+  }
+});
+
 minCitations.addEventListener('input', () => {
   minCitationsValue.textContent = minCitations.value + (minCitations.value === minCitations.max ? '+' : '');
 });
@@ -168,12 +200,16 @@ minCitations.addEventListener('input', () => {
 resetBtn.addEventListener('click', () => {
   searchInput.value = '';
   searchType.value = 'all';
+  articleFiltersRow.style.display = 'flex';
   sortCitations.checked = false;
   onlyFirat.checked = true;
   minCitations.value = 0;
   minCitationsValue.textContent = '0';
   filterYear.value = '';
   filterMonth.value = '';
+  academicResultsArea.style.display = 'none';
+  academicDetailPanel.style.display = 'none';
+  resultsArea.style.display = 'block';
   showEmpty('Aramaya başlamak için bir anahtar kelime girin.');
 });
 
@@ -183,6 +219,9 @@ function trLower(str) {
 
 function showEmpty(message, isError = false) {
   resultsMeta.textContent = '';
+  resultsArea.style.display = 'block';
+  academicResultsArea.style.display = 'none';
+  academicDetailPanel.style.display = 'none';
   resultsArea.innerHTML = `<div class="empty-state${isError ? ' error' : ''}">${message}</div>`;
 }
 
@@ -193,11 +232,6 @@ function formatCoverDate(dateStr) {
   return d.getFullYear();
 }
 
-// Bir makalenin DOI'sinden kaynağa (yayıncı sayfasına) giden URL'yi üretir.
-// Not: Scopus'un inward/record.uri linki eid+partnerID gerektiriyor (sadece
-// doi ile "Scopus is unable to process your request" hatası veriyor); elimizde
-// eid olmadığından DOI çözücü (doi.org) üzerinden orijinal kaynağa yönlendiriyoruz.
-// DOI yoksa null döner (link gösterilmez).
 function buildScopusUrl(article) {
   if (article && article.doi) {
     return `https://doi.org/${encodeURIComponent(article.doi)}`;
@@ -206,6 +240,10 @@ function buildScopusUrl(article) {
 }
 
 function renderResults(articles) {
+  academicResultsArea.style.display = 'none';
+  academicDetailPanel.style.display = 'none';
+  resultsArea.style.display = 'block';
+
   resultsMeta.innerHTML = `<strong>${articles.length}</strong> sonuç bulundu`;
 
   const citCounts = articles.map(a => Number(a.citedby_count) || 0);
@@ -250,6 +288,80 @@ function renderResults(articles) {
   });
 }
 
+/* --- AKADEMİSYEN / FAKÜLTE ARAMA MANTIĞI --- */
+async function runAcademicSearch(query) {
+  resultsArea.style.display = 'none';
+  academicDetailPanel.style.display = 'none';
+  academicResultsArea.style.display = 'block';
+  academicResultsArea.innerHTML = `<div class="empty-state">Akademisyenler taranıyor…</div>`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/academics/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    resultsMeta.innerHTML = `<strong>${data.length}</strong> akademisyen bulundu`;
+
+    if (data.length === 0) {
+      academicResultsArea.innerHTML = `<div class="empty-state">Aradığınız kriterlere uygun akademisyen bulunamadı.</div>`;
+      return;
+    }
+
+    academicResultsArea.innerHTML = data.map(academic => `
+      <div class="result-item" style="cursor: pointer;" onclick="loadAcademicDetail(${academic.id})">
+        <div class="result-body">
+          <div style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color, #0f172a);">${academic.name}</div>
+          <div style="color: #64748b; font-size: 0.9rem; margin-top: 4px;">Fakülte: <strong>${academic.faculty}</strong></div>
+          <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 2px;">${academic.email || 'E-posta tanımlanmamış'}</div>
+        </div>
+        <button class="btn-secondary" style="align-self: center;">Yayınları Gör &rarr;</button>
+      </div>
+    `).join('');
+
+  } catch (err) {
+    academicResultsArea.innerHTML = `<div class="empty-state error">Akademisyen araması yapılırken hata oluştu.</div>`;
+  }
+}
+
+async function loadAcademicDetail(academicId) {
+  academicDetailPanel.style.display = 'block';
+  const articlesContainer = document.getElementById('academicArticlesList');
+  articlesContainer.innerHTML = `<div class="empty-state">Yayınlar yükleniyor…</div>`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/academics/${academicId}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    document.getElementById('academicDetailName').textContent = data.name;
+    document.getElementById('academicDetailFaculty').textContent = data.faculty;
+    document.getElementById('academicDetailScopusId').textContent = data.scopus_author_id || 'Yok';
+
+    if (!data.articles || data.articles.length === 0) {
+      articlesContainer.innerHTML = `<div class="empty-state">Bu akademisyen için henüz Scopus yayını eşleşmedi.</div>`;
+    } else {
+      articlesContainer.innerHTML = data.articles.map(art => `
+        <div class="result-item">
+          <div class="seal-badge">
+            <span class="badge-label">Atıf</span>
+            <span class="badge-count">${art.citation_count ?? 0}</span>
+          </div>
+          <div class="result-body">
+            <div style="font-weight: 600; font-size: 1rem;">${art.title}</div>
+            <div class="article-meta">${art.publication_name || 'Dergi Yok'} · ${art.cover_date || ''}</div>
+            ${art.doi ? `<a href="https://doi.org/${art.doi}" target="_blank" style="font-size: 0.85rem; color: #0284c7;">DOI: ${art.doi}</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    academicDetailPanel.scrollIntoView({ behavior: 'smooth' });
+
+  } catch (err) {
+    articlesContainer.innerHTML = `<div class="empty-state error">Yayın detayları alınamadı.</div>`;
+  }
+}
+
 function openArticleModal(article) {
   const modal = document.getElementById('articleModal');
   modal.querySelector('.modal-title').textContent = article.art_name;
@@ -277,7 +389,6 @@ function openArticleModal(article) {
     keywordsEl.style.display = 'none';
   }
 
-  // Makalenin DOI'sine göre Scopus'a yönlendiren ok ikonunu göster/gizle
   const scopusLink = modal.querySelector('.modal-scopus-link');
   const scopusUrl = buildScopusUrl(article);
   if (scopusUrl) {
@@ -323,6 +434,12 @@ async function runSearch() {
 
   if (!query) {
     showEmpty('Lütfen aramak için bir kelime girin.', true);
+    return;
+  }
+
+  // Akademisyen araması modundaysa akademisyen arama fonksiyonunu çalıştır
+  if (searchType.value === 'academic') {
+    runAcademicSearch(rawQuery);
     return;
   }
 
