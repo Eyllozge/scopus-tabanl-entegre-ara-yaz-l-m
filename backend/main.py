@@ -215,3 +215,34 @@ def get_top_authors(limit: int = 5, db: Session = Depends(get_db)):
 
     # JSON listesine çeviriyor.
     return [{"author_name": row.auth_fullname, "article_count": row.article_count} for row in results]
+
+from fastapi import HTTPException, Query
+import crud
+
+
+@app.get("/api/academics/search")
+def search_academics_endpoint(
+    q: str = Query(..., min_length=2, description="Aramak istediğiniz hoca adı"),
+    db: Session = Depends(get_db),
+):
+    """Hoca adına göre arama endpoint'i."""
+    results = crud.search_academics(db, query=q)
+    return [
+        {
+            "id": ac.id,
+            "full_name": ac.name,
+            "email": ac.email,
+            "faculties": [ac.faculty.name] if ac.faculty else ["Belirtilmemiş"],
+            "scopus_author_id": ac.scopus_author_id,
+        }
+        for ac in results
+    ]
+
+
+@app.get("/api/academics/{academic_id}")
+def get_academic_detail_endpoint(academic_id: int, db: Session = Depends(get_db)):
+    """Hoca detayını, fakültesini ve Scopus makalelerini döndüren endpoint."""
+    detail = crud.get_academic_with_publications(db, academic_id=academic_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Akademisyen bulunamadı")
+    return detail
