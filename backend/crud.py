@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 from models import Article, Author, Institution, SyncLog
+from models import Faculty, Academic
+
 
 
 def get_or_create_author(db: Session, full_name: str, scopus_author_id: str = None, is_firat_academic: bool = False):
@@ -120,3 +122,73 @@ def is_data_fresh(db: Session, source: str, days: int) -> bool:
 
     age_days = (datetime.now(timezone.utc) - run_at).days
     return age_days < days
+
+
+def get_or_create_faculty(db: Session, name: str, unit_type: str = None, source_subdomain: str = None):
+    faculty = db.query(Faculty).filter(Faculty.name == name).first()
+    if not faculty:
+        faculty = Faculty(name=name, unit_type=unit_type, source_subdomain=source_subdomain)
+        db.add(faculty)
+        db.commit()
+        db.refresh(faculty)
+    return faculty
+
+
+def upsert_academic(db: Session, full_name: str, faculty_id: int, title: str = None,
+                     department: str = None, email: str = None, orcid: str = None,
+                     yok_author_id: str = None):
+    academic = db.query(Academic).filter(
+        Academic.full_name == full_name, Academic.faculty_id == faculty_id
+    ).first()
+    if academic:
+        academic.title = title or academic.title
+        academic.department = department or academic.department
+        academic.email = email or academic.email
+        academic.orcid = orcid or academic.orcid
+        academic.yok_author_id = yok_author_id or academic.yok_author_id
+    else:
+        academic = Academic(
+            full_name=full_name, faculty_id=faculty_id, title=title,
+            department=department, email=email, orcid=orcid, yok_author_id=yok_author_id,
+        )
+        db.add(academic)
+    db.commit()
+    db.refresh(academic)
+    return academic
+
+
+def match_academics_to_authors(db: Session):
+    import re
+
+    def normalize(name: str) -> str:
+        n = (name or "").lower()
+        for a, b in [("ı", "i"), ("ü", "u"), ("ö", "o"), ("ş", "s"), ("ç", "c"), ("ğ", "g")]:
+            n = n.replace(a, b)
+        return re.sub(r"[^a-z0-9]", "", n)
+
+    authors = db.query(Author).all()
+    author_map = {normalize(a.auth_fullname): a for a in authors}
+
+    used_author_ids = {
+        row.author_id for row in db.query(Academic.author_id).filter(Academic.author_id.isnot(None)).all()
+    }
+
+    matched = 0
+    skipped_duplicates = 0
+    for academic in db.query(Academic).filter(Academic.author_id.is_(None)).all():
+        key = normalize(academic.full_name)
+        author = author_map.get(key)
+        if not author:
+            continue
+        if author.id in used_author_ids:
+            skipped_duplicates += 1
+            continue
+        academic.author_id = author.id
+        author.is_firat_academic = True
+        used_author_ids.add(author.id)
+        matched += 1
+
+    db.commit()
+    if skipped_duplicates:
+        print(f"[BİLGİ] {skipped_duplicates} akademisyen zaten eşleşmiş bir yazara denk geldiği için atlandı.")
+    return matched

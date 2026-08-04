@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
-import services
+import services as services
 from typing import List, Optional
 from models import Article
-import schemas
+import schemas as schemas
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, extract
 from sqlalchemy import desc

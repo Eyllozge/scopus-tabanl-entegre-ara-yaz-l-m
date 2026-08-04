@@ -5,7 +5,7 @@ from datetime import datetime, date
 from typing import Optional
 from sqlalchemy.orm import Session
 
-import crud
+import crud as crud
 from models import Article
 
 #Genel ayarlar
