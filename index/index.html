@@ -17,7 +17,7 @@
   <div class="page">
     <header class="masthead">
       <div class="masthead-brand">
-        <!-- Kurumsal logo hissi veren ikon -->
+        <!-- ikon -->
         <svg class="seal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
           <path d="M8 7h6"/>
@@ -67,13 +67,26 @@
     </div>
 
     <div class="content">
-      <section class="search-panel">
+
+      <!-- Sekme Seçimi: Makale Arama vs Akademisyen/Fakülte Arama (bağımsız iki panel) -->
+      <div class="tab-bar" role="tablist" aria-label="Arama türü">
+        <button class="tab-btn active" id="tabArticles" role="tab" aria-selected="true" type="button">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+          Makale Arama
+        </button>
+        <button class="tab-btn" id="tabAcademics" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Fırat Akademisyen / Fakülte Arama
+        </button>
+      </div>
+
+      <!-- PANEL 1: Makale Arama (bağımsız) -->
+      <section class="search-panel" id="articleSearchPanel">
         <div class="search-row">
           <select id="searchType" class="field-select" aria-label="Arama alanı">
             <option value="all">Tüm Alanlar</option>
             <option value="title">Makale Adı</option>
             <option value="author">Yazar</option>
-            <option value="academic">Akademisyen / Fakülte</option>
             <option value="journal">Dergi Adı</option>
           </select>
           <input type="text" id="searchInput" class="field-input" placeholder="Aramak istediğiniz terimi girin…">
@@ -81,49 +94,76 @@
         </div>
 
         <div class="filter-row" id="articleFiltersRow">
-          <label class="switch">
-            <input type="checkbox" id="sortCitations">
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Atıfa göre sırala</span>
-          </label>
+          <div class="filter-group">
+            <span class="filter-group-label">Sıralama &amp; kapsam</span>
+            <div class="filter-group-body">
+              <label class="switch">
+                <input type="checkbox" id="sortCitations">
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+                <span class="switch-label">Atıfa göre sırala</span>
+              </label>
 
-          <label class="switch">
-            <input type="checkbox" id="onlyFirat" checked>
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Sadece Fırat Üni. Yayınları</span>
-          </label>
-
-          <div class="slider-group">
-            <label for="minCitations">En az atıf: <span id="minCitationsValue" class="slider-value">0</span></label>
-            <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
+              <label class="switch">
+                <input type="checkbox" id="onlyFirat" checked>
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+                <span class="switch-label">Sadece Fırat Üni. Yayınları</span>
+              </label>
+            </div>
           </div>
 
-          <div class="period-group">
-            <label for="filterYear">Yıl</label>
-            <select id="filterYear" class="field-select small-select">
-              <option value="">Tümü</option>
-            </select>
+          <div class="filter-group">
+            <span class="filter-group-label">Atıf eşiği</span>
+            <div class="filter-group-body">
+              <div class="slider-group">
+                <label for="minCitations">En az atıf: <span id="minCitationsValue" class="slider-value">0</span></label>
+                <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
+              </div>
+            </div>
+          </div>
 
-            <label for="filterMonth">Ay</label>
-            <select id="filterMonth" class="field-select small-select">
-              <option value="">Tümü</option>
-              <option value="1">Ocak</option>
-              <option value="2">Şubat</option>
-              <option value="3">Mart</option>
-              <option value="4">Nisan</option>
-              <option value="5">Mayıs</option>
-              <option value="6">Haziran</option>
-              <option value="7">Temmuz</option>
-              <option value="8">Ağustos</option>
-              <option value="9">Eylül</option>
-              <option value="10">Ekim</option>
-              <option value="11">Kasım</option>
-              <option value="12">Aralık</option>
-            </select>
+          <div class="filter-group">
+            <span class="filter-group-label">Dönem</span>
+            <div class="filter-group-body">
+              <div class="period-group">
+                <label for="filterYear">Yıl</label>
+                <select id="filterYear" class="field-select small-select">
+                  <option value="">Tümü</option>
+                </select>
+
+                <label for="filterMonth">Ay</label>
+                <select id="filterMonth" class="field-select small-select">
+                  <option value="">Tümü</option>
+                  <option value="1">Ocak</option>
+                  <option value="2">Şubat</option>
+                  <option value="3">Mart</option>
+                  <option value="4">Nisan</option>
+                  <option value="5">Mayıs</option>
+                  <option value="6">Haziran</option>
+                  <option value="7">Temmuz</option>
+                  <option value="8">Ağustos</option>
+                  <option value="9">Eylül</option>
+                  <option value="10">Ekim</option>
+                  <option value="11">Kasım</option>
+                  <option value="12">Aralık</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <button id="resetBtn" class="btn-secondary" type="button">Filtreleri Temizle</button>
         </div>
+      </section>
+
+      <!-- PANEL 2: Fırat Akademisyen / Fakülte Arama (bağımsız, artık ayrı bir sekme) -->
+      <section class="search-panel" id="academicSearchPanel" style="display:none;">
+        <div class="search-row">
+          <input type="text" id="academicSearchInput" class="field-input" placeholder="Akademisyen adı girin (opsiyonel)…">
+          <select id="academicFacultySelect" class="field-select" aria-label="Fakülte filtresi">
+            <option value="">Tüm Fakülteler</option>
+          </select>
+          <button id="academicSearchBtn" class="btn-primary">Ara</button>
+        </div>
+        <p class="panel-hint">Fırat Üniversitesi akademisyenlerine ve Scopus'ta indekslenmiş yayınlarına özel arama. İsim girin, bir fakülte seçin ya da ikisini birlikte kullanın.</p>
       </section>
 
       <!-- Arama Sonuç Alanı -->
@@ -174,6 +214,77 @@ const academicDetailPanel = document.getElementById('academicDetailPanel');
 const resultsMeta = document.getElementById('resultsMeta');
 const articleFiltersRow = document.getElementById('articleFiltersRow');
 
+// Sekme (tab) elemanları — Makale Arama ve Akademisyen/Fakülte Arama artık iki bağımsız panel old. için
+const tabArticles = document.getElementById('tabArticles');
+const tabAcademics = document.getElementById('tabAcademics');
+const articleSearchPanel = document.getElementById('articleSearchPanel');
+const academicSearchPanel = document.getElementById('academicSearchPanel');
+const academicSearchInput = document.getElementById('academicSearchInput');
+const academicFacultySelect = document.getElementById('academicFacultySelect');
+const academicSearchBtn = document.getElementById('academicSearchBtn');
+
+function switchTab(target) {
+  const isArticles = target === 'articles';
+  tabArticles.classList.toggle('active', isArticles);
+  tabAcademics.classList.toggle('active', !isArticles);
+  tabArticles.setAttribute('aria-selected', isArticles);
+  tabAcademics.setAttribute('aria-selected', !isArticles);
+  articleSearchPanel.style.display = isArticles ? 'block' : 'none';
+  academicSearchPanel.style.display = isArticles ? 'none' : 'block';
+
+  // Sonuç alanlarını da sekmeye göre sıfırla sekmeler karışmaması için
+  if (isArticles) {
+    academicResultsArea.style.display = 'none';
+    academicDetailPanel.style.display = 'none';
+    resultsArea.style.display = 'block';
+    showEmpty('Aramaya başlamak için bir anahtar kelime girin.');
+  } else {
+    resultsArea.style.display = 'none';
+    academicDetailPanel.style.display = 'none';
+    academicResultsArea.style.display = 'block';
+    academicResultsArea.innerHTML = `<div class="empty-state">Bir isim girin ya da bir fakülte seçin.</div>`;
+    resultsMeta.textContent = '';
+  }
+}
+
+tabArticles.addEventListener('click', () => switchTab('articles'));
+tabAcademics.addEventListener('click', () => switchTab('academics'));
+
+// Fakülte dropdown'unu API'den doldur
+async function loadFaculties() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/faculties`);
+    if (!res.ok) throw new Error();
+    const faculties = await res.json();
+    faculties.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = `${f.name} (${f.academic_count})`;
+      academicFacultySelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.warn('Fakülte listesi alınamadı:', err);
+  }
+}
+loadFaculties();
+
+academicSearchBtn.addEventListener('click', () => {
+  const name = academicSearchInput.value.trim();
+  const facultyId = academicFacultySelect.value;
+  if (!name && !facultyId) {
+    academicResultsArea.style.display = 'block';
+    academicResultsArea.innerHTML = `<div class="empty-state error">Arama için bir isim girin ya da bir fakülte seçin.</div>`;
+    return;
+  }
+  runAcademicSearch(name, facultyId);
+});
+academicSearchInput.addEventListener('keypress', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    academicSearchBtn.click();
+  }
+});
+
 // Yıl dropdown'unu doldur
 (function populateYears() {
   for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) {
@@ -184,15 +295,6 @@ const articleFiltersRow = document.getElementById('articleFiltersRow');
   }
 })();
 
-// Arama tipine göre filtre alanını gizle/göster
-searchType.addEventListener('change', () => {
-  if (searchType.value === 'academic') {
-    articleFiltersRow.style.display = 'none';
-  } else {
-    articleFiltersRow.style.display = 'flex';
-  }
-});
-
 minCitations.addEventListener('input', () => {
   minCitationsValue.textContent = minCitations.value + (minCitations.value === minCitations.max ? '+' : '');
 });
@@ -200,15 +302,12 @@ minCitations.addEventListener('input', () => {
 resetBtn.addEventListener('click', () => {
   searchInput.value = '';
   searchType.value = 'all';
-  articleFiltersRow.style.display = 'flex';
   sortCitations.checked = false;
   onlyFirat.checked = true;
   minCitations.value = 0;
   minCitationsValue.textContent = '0';
   filterYear.value = '';
   filterMonth.value = '';
-  academicResultsArea.style.display = 'none';
-  academicDetailPanel.style.display = 'none';
   resultsArea.style.display = 'block';
   showEmpty('Aramaya başlamak için bir anahtar kelime girin.');
 });
@@ -288,15 +387,19 @@ function renderResults(articles) {
   });
 }
 
-/* --- AKADEMİSYEN / FAKÜLTE ARAMA MANTIĞI --- */
-async function runAcademicSearch(query) {
+/* AKADEMİSYEN - FAKÜLTE ARAMA */
+async function runAcademicSearch(name, facultyId) {
   resultsArea.style.display = 'none';
   academicDetailPanel.style.display = 'none';
   academicResultsArea.style.display = 'block';
   academicResultsArea.innerHTML = `<div class="empty-state">Akademisyenler taranıyor…</div>`;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/academics/search?q=${encodeURIComponent(query)}`);
+    const params = new URLSearchParams();
+    if (name) params.set('q', name);
+    if (facultyId) params.set('faculty_id', facultyId);
+
+    const res = await fetch(`${API_BASE_URL}/api/academics/search?${params.toString()}`);
     if (!res.ok) throw new Error();
     const data = await res.json();
 
@@ -434,12 +537,6 @@ async function runSearch() {
 
   if (!query) {
     showEmpty('Lütfen aramak için bir kelime girin.', true);
-    return;
-  }
-
-  // Akademisyen araması modundaysa akademisyen arama fonksiyonunu çalıştır
-  if (searchType.value === 'academic') {
-    runAcademicSearch(rawQuery);
     return;
   }
 

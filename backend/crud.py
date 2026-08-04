@@ -119,6 +119,19 @@ def is_data_fresh(db: Session, source: str, days: int) -> bool:
     return age_days < days
 
 
+def list_faculties(db: Session):
+    """Fakülte filtre dropdown'u için tüm fakülteleri (akademisyen sayısıyla) döndürür."""
+    from sqlalchemy import func as sa_func
+    rows = (
+        db.query(Faculty, sa_func.count(Academic.id).label("academic_count"))
+        .outerjoin(Academic, Academic.faculty_id == Faculty.id)
+        .group_by(Faculty.id)
+        .order_by(Faculty.name)
+        .all()
+    )
+    return [{"id": f.id, "name": f.name, "unit_type": f.unit_type, "academic_count": count} for f, count in rows]
+
+
 def get_or_create_faculty(db: Session, name: str, unit_type: str = None, source_subdomain: str = None):
     faculty = db.query(Faculty).filter(Faculty.name == name).first()
     if not faculty:
@@ -189,14 +202,37 @@ def match_academics_to_authors(db: Session):
     return matched
 
 
-def search_academics(db: Session, query: str):
-    """Hoca ad veya soyadına göre (full_name üzerinden) arama yapar."""
-    return (
-        db.query(Academic)
-        .options(joinedload(Academic.faculty), joinedload(Academic.author))
-        .filter(Academic.full_name.ilike(f"%{query}%"))
-        .all()
-    )
+def _normalize_tr(text: str) -> str:
+    """Türkçe karakter/case farklarından bağımsız karşılaştırma için normalize eder.
+    (ILIKE bazı veritabanı locale'lerinde 'İ/I/ı/i' gibi Türkçe harfleri doğru
+    küçültmediği için var olan bir kayıt bile bulunamıyordu; bu yüzden karşılaştırma
+    Python tarafında, karakter eşlemesiyle yapılıyor.)"""
+    n = (text or "").lower()
+    for a, b in [("ı", "i"), ("i̇", "i"), ("ü", "u"), ("ö", "o"), ("ş", "s"), ("ç", "c"), ("ğ", "g")]:
+        n = n.replace(a, b)
+    return n
+
+
+def search_academics(db: Session, query: str = None, faculty_id: int = None):
+    """Hoca adına ve/veya fakülteye göre arama yapar.
+    - query: ad/soyada göre (Türkçe karakterlere duyarsız) serbest metin arama
+    - faculty_id: seçilen fakülteye göre kesin filtre
+    """
+    base = db.query(Academic).options(joinedload(Academic.faculty), joinedload(Academic.author))
+    if faculty_id:
+        base = base.filter(Academic.faculty_id == faculty_id)
+
+    academics = base.all()
+
+    if query:
+        norm_q = _normalize_tr(query)
+        academics = [
+            a for a in academics
+            if norm_q in _normalize_tr(a.full_name)
+            or (a.faculty and norm_q in _normalize_tr(a.faculty.name))
+        ]
+
+    return academics
 
 
 def get_academic_with_publications(db: Session, academic_id: int):
@@ -214,7 +250,7 @@ def get_academic_with_publications(db: Session, academic_id: int):
     articles = []
     scopus_author_id = None
 
-    # Academic -> Author ilişkisi kontrolü
+    # Academic -> Author ilişkisi kontrolü hata alınca genelde burdan yanlış eşleşme oluyor
     if academic.author:
         scopus_author_id = academic.author.scopus_author_id
         if hasattr(academic.author, "articles"):
