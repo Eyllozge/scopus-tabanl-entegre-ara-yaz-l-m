@@ -61,6 +61,12 @@
         <span class="switch-label">Atıfa göre sırala</span>
       </label>
 
+      <label class="switch">
+       <input type="checkbox" id="onlyFirat" checked>
+       <span class="switch-track"><span class="switch-thumb"></span></span>
+       <span class="switch-label">Sadece Fırat Üni. Yayınları</span>
+</label>
+
       <div class="slider-group">
         <label for="minCitations">En az atıf<span id="minCitationsValue" class="slider-value">0</span></label>
         <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
@@ -79,13 +85,13 @@
 </div>
 
 <script>
-// Lokal geliştirme için local IP; canlıya alırken Render URL'ini buraya yazarsın.
 const API_BASE_URL = "http://127.0.0.1:8000";
 
 const searchBtn = document.getElementById('searchBtn');
 const searchInput = document.getElementById('searchInput');
 const searchType = document.getElementById('searchType');
 const sortCitations = document.getElementById('sortCitations');
+const onlyFirat = document.getElementById('onlyFirat'); 
 const minCitations = document.getElementById('minCitations');
 const minCitationsValue = document.getElementById('minCitationsValue');
 const resultsArea = document.getElementById('resultsArea');
@@ -178,6 +184,10 @@ async function runSearch() {
     
     if (sortCitations.checked) {
       url += `&sort_by_citations=true`;
+    }
+
+    if (onlyFirat && onlyFirat.checked) {
+      url += `&only_firat=true`;
     }
 
     if (searchType.value === 'journal') {
