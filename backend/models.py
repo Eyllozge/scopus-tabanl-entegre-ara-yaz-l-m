@@ -67,3 +67,31 @@ class SyncLog(Base):
     status = Column(String, nullable=False)
     records_fetched = Column(Integer, default=0)
     note = Column(Text, nullable=True)
+    
+class Faculty(Base):
+    __tablename__ = 'faculties'
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    unit_type = Column(String, nullable=True)
+    source_subdomain = Column(String, unique=True, nullable=True)
+
+    academics = relationship("Academic", back_populates="faculty")
+
+
+class Academic(Base):
+    __tablename__ = 'academics'
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, index=True, nullable=False)
+    title = Column(String, nullable=True)
+    department = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    orcid = Column(String, nullable=True)
+    yok_author_id = Column(String, nullable=True)
+    faculty_id = Column(Integer, ForeignKey('faculties.id'), nullable=True)
+    author_id = Column(Integer, ForeignKey('authors.id'), unique=True, nullable=True)
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    faculty = relationship("Faculty", back_populates="academics")
+    author = relationship("Author")
