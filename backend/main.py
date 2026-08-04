@@ -15,6 +15,7 @@ from database import SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from models import Institution
+import crud
 
 
 def scheduled_scopus_sync():
@@ -216,24 +217,35 @@ def get_top_authors(limit: int = 5, db: Session = Depends(get_db)):
     # JSON listesine çeviriyor.
     return [{"author_name": row.auth_fullname, "article_count": row.article_count} for row in results]
 
-from fastapi import HTTPException, Query
-import crud
+
+@app.get("/api/faculties")
+def get_faculties(db: Session = Depends(get_db)):
+    """Fakülte filtre dropdown'unu doldurmak için tüm fakülteleri döndürür."""
+    return crud.list_faculties(db)
 
 
 @app.get("/api/academics/search")
 def search_academics_endpoint(
-    q: str = Query(..., min_length=2, description="Aramak istediğiniz hoca adı"),
+    q: Optional[str] = Query(None, min_length=2, description="Aramak istediğiniz hoca adı"),
+    faculty_id: Optional[int] = Query(None, description="Fakülteye göre filtrele"),
     db: Session = Depends(get_db),
 ):
-    """Hoca adına göre arama endpoint'i."""
-    results = crud.search_academics(db, query=q)
+    """Hoca adına ve/veya fakülteye göre arama endpoint'i."""
+    if not q and not faculty_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Arama için bir isim girin ya da bir fakülte seçin."
+        )
+
+    results = crud.search_academics(db, query=q, faculty_id=faculty_id)
     return [
         {
             "id": ac.id,
-            "full_name": ac.name,
+            "name": ac.full_name,
+            "title": ac.title,
             "email": ac.email,
-            "faculties": [ac.faculty.name] if ac.faculty else ["Belirtilmemiş"],
-            "scopus_author_id": ac.scopus_author_id,
+            "faculty": ac.faculty.name if ac.faculty else "Belirtilmemiş",
+            "scopus_author_id": ac.author.scopus_author_id if ac.author else None,
         }
         for ac in results
     ]
