@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from database import SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
+from models import Institution
 
 
 def scheduled_scopus_sync():
@@ -72,6 +73,7 @@ def get_articles(
     limit: int = 10,
     journal: Optional[str] = None,
     sort_by_citations: bool = False,
+    only_firat: bool = False,  
     year: Optional[int] = None,
     month: Optional[int] = Query(None, ge=1, le=12),
     db: Session = Depends(get_db)
@@ -80,6 +82,12 @@ def get_articles(
         joinedload(Article.authors),
         joinedload(Article.institutions)
     )
+    
+    if only_firat:
+        query = query.filter(
+            (Article.authors.any(Author.is_firat_academic == True)) |
+            (Article.institutions.any(Institution.is_firat == True))
+        )
 
     if journal:
         query = query.filter(Article.publication_name.ilike(f"%{journal}%"))
