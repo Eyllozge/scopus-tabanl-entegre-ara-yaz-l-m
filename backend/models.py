@@ -74,10 +74,9 @@ class Faculty(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     unit_type = Column(String, nullable=True)
-    source_subdomain = Column(String, unique=True, nullable=True)
+    source_subdomain = Column(String, nullable=True)  # unique=True kaldırıldı
 
     academics = relationship("Academic", back_populates="faculty")
-
 
 class Academic(Base):
     __tablename__ = 'academics'
