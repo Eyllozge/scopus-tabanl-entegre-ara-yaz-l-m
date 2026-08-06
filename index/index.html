@@ -8,21 +8,127 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+
+<!-- tsParticles Kütüphanesi (ABS Yapısı) -->
+<script src="https://cdn.jsdelivr.net/npm/tsparticles@2.0.0/tsparticles.bundle.min.js"></script>
+
+<style>
+  /* Arka plan tsParticles katmanı */
+  #tsparticles {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* Mevcut CSS baloncukları için yedek stil tanımı */
+  .bg-dots {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .dot {
+    position: absolute;
+    background-color: #78113e;
+    border-radius: 50%;
+    opacity: 0.5;
+    animation: floatDots linear infinite;
+  }
+  @keyframes floatDots {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+    100% { transform: translateY(0px); }
+  }
+
+  /* Akademisyen İçi Yayın Listesi Akordeon Alanı */
+  .academic-inline-detail {
+    width: 100%;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border-color, #e2e8f0);
+    display: none;
+  }
+
+  /* Kurumsal Checkbox Stilleri */
+  .corp-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #475569;
+    user-select: none;
+  }
+  .corp-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: #fff;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    margin: 0;
+  }
+  .corp-checkbox:hover {
+    border-color: #94a3b8;
+  }
+  .corp-checkbox:checked {
+    background-color: #78113e;
+    border-color: #78113e;
+  }
+  .corp-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 5px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+</style>
 </head>
 <body>
+
+  <!-- tsParticles Arka Plan Konteyneri -->
+  <div id="tsparticles"></div>
 
   <!-- Kurumsal Üst Şerit -->
   <div class="corporate-topbar"></div>
 
+  <!-- Yavaşça hareket eden dekoratif baloncuklar -->
+  <div class="bg-dots" aria-hidden="true">
+    <span class="dot" style="top:4%; left:2%; width:5px; height:5px; animation-duration:22s; animation-delay:-2s;"></span>
+    <span class="dot" style="top:9%; left:8%; width:3px; height:3px; animation-duration:18s; animation-delay:-9s;"></span>
+    <span class="dot" style="top:15%; left:1%; width:4px; height:4px; animation-duration:26s; animation-delay:-4s;"></span>
+    <span class="dot" style="top:22%; left:6%; width:3px; height:3px; animation-duration:20s; animation-delay:-13s;"></span>
+    <span class="dot" style="top:31%; left:3%; width:6px; height:6px; animation-duration:24s; animation-delay:-6s;"></span>
+    <span class="dot" style="top:40%; left:9%; width:3px; height:3px; animation-duration:19s; animation-delay:-1s;"></span>
+    <span class="dot" style="top:52%; left:2%; width:4px; height:4px; animation-duration:27s; animation-delay:-16s;"></span>
+    <span class="dot" style="top:63%; left:7%; width:3px; height:3px; animation-duration:21s; animation-delay:-8s;"></span>
+    <span class="dot" style="top:74%; left:4%; width:5px; height:5px; animation-duration:23s; animation-delay:-11s;"></span>
+    <span class="dot" style="top:85%; left:9%; width:3px; height:3px; animation-duration:18s; animation-delay:-3s;"></span>
+    <span class="dot" style="top:93%; left:2%; width:4px; height:4px; animation-duration:25s; animation-delay:-14s;"></span>
+  </div>
+
   <div class="page">
     <header class="masthead">
       <div class="masthead-brand">
-        <!-- ikon -->
-        <svg class="seal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
-          <path d="M8 7h6"/>
-          <path d="M8 11h8"/>
-        </svg>
+        <!-- Fırat Üniversitesi resmi amblemi -->
+        <img src="firat_logo.jpeg" alt="Fırat Üniversitesi Amblemi" class="seal">
         <div class="masthead-text">
           <h1>Akademik Atıf Dizini</h1>
           <p class="eyebrow">Fırat Üniversitesi · Scopus Tabanlı Yayın Arşivi</p>
@@ -68,7 +174,7 @@
 
     <div class="content">
 
-      <!-- Sekme Seçimi: Makale Arama vs Akademisyen/Fakülte Arama (bağımsız iki panel) -->
+      <!-- Sekme Seçimi -->
       <div class="tab-bar" role="tablist" aria-label="Arama türü">
         <button class="tab-btn active" id="tabArticles" role="tab" aria-selected="true" type="button">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
@@ -80,7 +186,7 @@
         </button>
       </div>
 
-      <!-- PANEL 1: Makale Arama (bağımsız) -->
+      <!-- PANEL 1: Makale Arama -->
       <section class="search-panel" id="articleSearchPanel">
         <div class="search-row">
           <select id="searchType" class="field-select" aria-label="Arama alanı">
@@ -93,68 +199,69 @@
           <button id="searchBtn" class="btn-primary">Ara</button>
         </div>
 
-        <div class="filter-row" id="articleFiltersRow">
-          <div class="filter-group">
-            <span class="filter-group-label">Sıralama &amp; kapsam</span>
-            <div class="filter-group-body">
-              <label class="switch">
-                <input type="checkbox" id="sortCitations">
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-                <span class="switch-label">Atıfa göre sırala</span>
-              </label>
+        <!-- Modernleştirilmiş ve Birleştirilmiş Filtre Çubuğu -->
+        <div class="filter-row" id="articleFiltersRow" style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; background: #f8fafc; padding: 16px 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          
+          <!-- Sıralama & Kapsam & Son 30 Gün (Sol Kısım - Kurumsal Checkbox) -->
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center; border-right: 1px solid #cbd5e1; padding-right: 24px;">
+            
+            <label class="corp-checkbox-label">
+              <input type="checkbox" id="sortCitations" class="corp-checkbox">
+              <span>Atıfa göre sırala</span>
+            </label>
 
-              <label class="switch">
-                <input type="checkbox" id="onlyFirat" checked>
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-                <span class="switch-label">Sadece Fırat Üni. Yayınları</span>
-              </label>
-            </div>
+            <label class="corp-checkbox-label">
+              <input type="checkbox" id="onlyFirat" class="corp-checkbox" checked>
+              <span>Sadece Fırat Üni.</span>
+            </label>
+
+            <label class="corp-checkbox-label">
+              <input type="checkbox" id="recent30Days" class="corp-checkbox">
+              <span>Son 30 Gün</span>
+            </label>
+
           </div>
 
-          <div class="filter-group">
-            <span class="filter-group-label">Atıf eşiği</span>
-            <div class="filter-group-body">
-              <div class="slider-group">
-                <label for="minCitations">En az atıf: <span id="minCitationsValue" class="slider-value">0</span></label>
-                <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
-              </div>
-            </div>
+          <!-- Dönem (Orta Kısım) -->
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 0.9rem; font-weight: 600; color: #334155;">Dönem Filtresi:</span>
+            
+            <select id="filterYear" class="field-select small-select" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem; outline: none; cursor: pointer; background-color: #ffffff; color: #0f172a; transition: border-color 0.2s;">
+              <option value="">Tüm Yıllar</option>
+            </select>
+            
+            <select id="filterMonth" class="field-select small-select" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.9rem; outline: none; cursor: pointer; background-color: #ffffff; color: #0f172a; transition: border-color 0.2s;">
+              <option value="">Tüm Aylar</option>
+              <option value="1">Ocak</option>
+              <option value="2">Şubat</option>
+              <option value="3">Mart</option>
+              <option value="4">Nisan</option>
+              <option value="5">Mayıs</option>
+              <option value="6">Haziran</option>
+              <option value="7">Temmuz</option>
+              <option value="8">Ağustos</option>
+              <option value="9">Eylül</option>
+              <option value="10">Ekim</option>
+              <option value="11">Kasım</option>
+              <option value="12">Aralık</option>
+            </select>
           </div>
 
-          <div class="filter-group">
-            <span class="filter-group-label">Dönem</span>
-            <div class="filter-group-body">
-              <div class="period-group">
-                <label for="filterYear">Yıl</label>
-                <select id="filterYear" class="field-select small-select">
-                  <option value="">Tümü</option>
-                </select>
+          <!-- Arayı Doldurucu (Spacer) -->
+          <div style="flex: 1;"></div>
 
-                <label for="filterMonth">Ay</label>
-                <select id="filterMonth" class="field-select small-select">
-                  <option value="">Tümü</option>
-                  <option value="1">Ocak</option>
-                  <option value="2">Şubat</option>
-                  <option value="3">Mart</option>
-                  <option value="4">Nisan</option>
-                  <option value="5">Mayıs</option>
-                  <option value="6">Haziran</option>
-                  <option value="7">Temmuz</option>
-                  <option value="8">Ağustos</option>
-                  <option value="9">Eylül</option>
-                  <option value="10">Ekim</option>
-                  <option value="11">Kasım</option>
-                  <option value="12">Aralık</option>
-                </select>
-              </div>
-            </div>
+          <!-- JavaScript'in bozulmaması için atıf eşiği HTML elementleri gizli olarak tutuluyor -->
+          <div style="display: none;">
+            <label for="minCitations">En az atıf: <span id="minCitationsValue" class="slider-value">0</span></label>
+            <input type="range" id="minCitations" min="0" max="300" value="0" step="5">
           </div>
 
-          <button id="resetBtn" class="btn-secondary" type="button">Filtreleri Temizle</button>
+          <!-- Temizle Butonu (Sağ Kısım) -->
+          <button id="resetBtn" class="btn-secondary" type="button" style="padding: 6px 16px; font-size: 0.9rem; border-radius: 6px; cursor: pointer; transition: background 0.2s; white-space: nowrap;">Filtreleri Temizle</button>
         </div>
       </section>
 
-      <!-- PANEL 2: Fırat Akademisyen / Fakülte Arama (bağımsız, artık ayrı bir sekme) -->
+      <!-- PANEL 2: Fırat Akademisyen / Fakülte Arama -->
       <section class="search-panel" id="academicSearchPanel" style="display:none;">
         <div class="search-row">
           <input type="text" id="academicSearchInput" class="field-input" placeholder="Akademisyen adı girin (opsiyonel)…">
@@ -175,25 +282,54 @@
           <div class="empty-state">Aramaya başlamak için bir anahtar kelime girin.</div>
         </div>
 
-        <!-- Akademisyen Listeleme Alanı (Arama türü 'academic' seçildiğinde açılır) -->
+        <!-- Akademisyen Listeleme Alanı -->
         <div id="academicResultsArea" class="results-list" style="display: none;"></div>
-
-        <!-- Akademisyen Detay Paneli (Seçilen Akademisyenin Yayınları) -->
-        <div id="academicDetailPanel" class="modal-box" style="display: none; margin-top: 24px; width: 100%; border: 1px solid var(--border-color, #e2e8f0); background: #fff;">
-          <div class="modal-title-row">
-            <h2 id="academicDetailName" class="modal-title"></h2>
-          </div>
-          <p><strong>Fakülte:</strong> <span id="academicDetailFaculty" class="badge" style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 600;"></span></p>
-          <p style="margin-bottom: 16px;"><strong>Scopus Author ID:</strong> <span id="academicDetailScopusId"></span></p>
-
-          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 12px;">Scopus İndeksli Yayınlar</h3>
-          <div id="academicArticlesList" class="results-list"></div>
-        </div>
       </section>
     </div>
   </div>
 
 <script>
+// ABS tsParticles Yapılandırması
+const particleOptions = {
+    interactivity: {
+        events: {
+            onClick: {
+                enable: true,
+                mode: "push"
+            }
+        },
+        modes: {
+            push: {
+                quantity: 1
+            }
+        }
+    },
+    particles: {
+        color: { value: "#78113e" },
+        line_linked: {
+            enable: true,
+            distance: 150,
+            color: "#78113e",
+            opacity: 0.4,
+            width: 1
+        },
+        move: {
+            enable: true,
+            speed: 0.5
+        },
+        opacity: {
+            value: { min: 0.3, max: 0.7 }
+        },
+        size: {
+            value: { min: 1, max: 3 }
+        }
+    }
+};
+
+if (window.tsParticles) {
+    tsParticles.load("tsparticles", particleOptions);
+}
+
 const API_BASE_URL = "http://127.0.0.1:8000";
 const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 1990;
@@ -203,6 +339,7 @@ const searchInput = document.getElementById('searchInput');
 const searchType = document.getElementById('searchType');
 const sortCitations = document.getElementById('sortCitations');
 const onlyFirat = document.getElementById('onlyFirat');
+const recent30Days = document.getElementById('recent30Days');
 const minCitations = document.getElementById('minCitations');
 const minCitationsValue = document.getElementById('minCitationsValue');
 const filterYear = document.getElementById('filterYear');
@@ -210,11 +347,10 @@ const filterMonth = document.getElementById('filterMonth');
 const resetBtn = document.getElementById('resetBtn');
 const resultsArea = document.getElementById('resultsArea');
 const academicResultsArea = document.getElementById('academicResultsArea');
-const academicDetailPanel = document.getElementById('academicDetailPanel');
 const resultsMeta = document.getElementById('resultsMeta');
 const articleFiltersRow = document.getElementById('articleFiltersRow');
 
-// Sekme (tab) elemanları — Makale Arama ve Akademisyen/Fakülte Arama artık iki bağımsız panel old. için
+// Sekme (tab) elemanları
 const tabArticles = document.getElementById('tabArticles');
 const tabAcademics = document.getElementById('tabAcademics');
 const articleSearchPanel = document.getElementById('articleSearchPanel');
@@ -232,15 +368,12 @@ function switchTab(target) {
   articleSearchPanel.style.display = isArticles ? 'block' : 'none';
   academicSearchPanel.style.display = isArticles ? 'none' : 'block';
 
-  // Sonuç alanlarını da sekmeye göre sıfırla sekmeler karışmaması için
   if (isArticles) {
     academicResultsArea.style.display = 'none';
-    academicDetailPanel.style.display = 'none';
     resultsArea.style.display = 'block';
     showEmpty('Aramaya başlamak için bir anahtar kelime girin.');
   } else {
     resultsArea.style.display = 'none';
-    academicDetailPanel.style.display = 'none';
     academicResultsArea.style.display = 'block';
     academicResultsArea.innerHTML = `<div class="empty-state">Bir isim girin ya da bir fakülte seçin.</div>`;
     resultsMeta.textContent = '';
@@ -250,7 +383,6 @@ function switchTab(target) {
 tabArticles.addEventListener('click', () => switchTab('articles'));
 tabAcademics.addEventListener('click', () => switchTab('academics'));
 
-// Fakülte dropdown'unu API'den doldur
 async function loadFaculties() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/faculties`);
@@ -278,6 +410,7 @@ academicSearchBtn.addEventListener('click', () => {
   }
   runAcademicSearch(name, facultyId);
 });
+
 academicSearchInput.addEventListener('keypress', event => {
   if (event.key === 'Enter') {
     event.preventDefault();
@@ -285,7 +418,6 @@ academicSearchInput.addEventListener('keypress', event => {
   }
 });
 
-// Yıl dropdown'unu doldur
 (function populateYears() {
   for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) {
     const opt = document.createElement('option');
@@ -304,6 +436,7 @@ resetBtn.addEventListener('click', () => {
   searchType.value = 'all';
   sortCitations.checked = false;
   onlyFirat.checked = true;
+  recent30Days.checked = false;
   minCitations.value = 0;
   minCitationsValue.textContent = '0';
   filterYear.value = '';
@@ -320,7 +453,6 @@ function showEmpty(message, isError = false) {
   resultsMeta.textContent = '';
   resultsArea.style.display = 'block';
   academicResultsArea.style.display = 'none';
-  academicDetailPanel.style.display = 'none';
   resultsArea.innerHTML = `<div class="empty-state${isError ? ' error' : ''}">${message}</div>`;
 }
 
@@ -340,7 +472,6 @@ function buildScopusUrl(article) {
 
 function renderResults(articles) {
   academicResultsArea.style.display = 'none';
-  academicDetailPanel.style.display = 'none';
   resultsArea.style.display = 'block';
 
   resultsMeta.innerHTML = `<strong>${articles.length}</strong> sonuç bulundu`;
@@ -387,10 +518,9 @@ function renderResults(articles) {
   });
 }
 
-/* AKADEMİSYEN - FAKÜLTE ARAMA */
+/* --- AKADEMİSYEN / FAKÜLTE ARAMA MANTIĞI (Doğrudan kart altında açılır) --- */
 async function runAcademicSearch(name, facultyId) {
   resultsArea.style.display = 'none';
-  academicDetailPanel.style.display = 'none';
   academicResultsArea.style.display = 'block';
   academicResultsArea.innerHTML = `<div class="empty-state">Akademisyenler taranıyor…</div>`;
 
@@ -411,13 +541,19 @@ async function runAcademicSearch(name, facultyId) {
     }
 
     academicResultsArea.innerHTML = data.map(academic => `
-      <div class="result-item" style="cursor: pointer;" onclick="loadAcademicDetail(${academic.id})">
-        <div class="result-body">
-          <div style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color, #0f172a);">${academic.name}</div>
-          <div style="color: #64748b; font-size: 0.9rem; margin-top: 4px;">Fakülte: <strong>${academic.faculty}</strong></div>
-          <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 2px;">${academic.email || 'E-posta tanımlanmamış'}</div>
+      <div class="result-item" style="flex-direction: column; align-items: stretch; cursor: pointer;" onclick="toggleAcademicDetail(event, ${academic.id})">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <div class="result-body">
+            <div style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color, #0f172a);">${academic.name}</div>
+            <div style="color: #64748b; font-size: 0.9rem; margin-top: 4px;">Fakülte: <strong>${academic.faculty}</strong></div>
+            <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 2px;">${academic.email || 'E-posta tanımlanmamış'}</div>
+          </div>
+          <button class="btn-secondary toggle-btn" style="align-self: center; pointer-events: none;">Yayınları Gör &darr;</button>
         </div>
-        <button class="btn-secondary" style="align-self: center;">Yayınları Gör &rarr;</button>
+        
+        <!-- Yayınların kartın HEMEN ALTINDA ekleneceği iç alan -->
+        <div id="academic-detail-${academic.id}" class="academic-inline-detail" onclick="event.stopPropagation()">
+        </div>
       </div>
     `).join('');
 
@@ -426,42 +562,54 @@ async function runAcademicSearch(name, facultyId) {
   }
 }
 
-async function loadAcademicDetail(academicId) {
-  academicDetailPanel.style.display = 'block';
-  const articlesContainer = document.getElementById('academicArticlesList');
-  articlesContainer.innerHTML = `<div class="empty-state">Yayınlar yükleniyor…</div>`;
+async function toggleAcademicDetail(event, academicId) {
+  const container = document.getElementById(`academic-detail-${academicId}`);
+  const parentCard = container.closest('.result-item');
+  const btn = parentCard.querySelector('.toggle-btn');
+
+  // Açık olan kartın tekrar tıklanması durumunda kapatılması
+  if (container.style.display === 'block') {
+    container.style.display = 'none';
+    btn.innerHTML = 'Yayınları Gör &darr;';
+    return;
+  }
+
+  container.style.display = 'block';
+  btn.innerHTML = 'Yayınları Gizle &uarr;';
+  container.innerHTML = `<div class="empty-state" style="padding: 12px 0;">Yayınlar yükleniyor…</div>`;
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/academics/${academicId}`);
     if (!res.ok) throw new Error();
     const data = await res.json();
 
-    document.getElementById('academicDetailName').textContent = data.name;
-    document.getElementById('academicDetailFaculty').textContent = data.faculty;
-    document.getElementById('academicDetailScopusId').textContent = data.scopus_author_id || 'Yok';
-
     if (!data.articles || data.articles.length === 0) {
-      articlesContainer.innerHTML = `<div class="empty-state">Bu akademisyen için henüz Scopus yayını eşleşmedi.</div>`;
+      container.innerHTML = `<div class="empty-state" style="padding: 12px 0;">Bu akademisyen için henüz Scopus yayını eşleşmedi.</div>`;
     } else {
-      articlesContainer.innerHTML = data.articles.map(art => `
-        <div class="result-item">
-          <div class="seal-badge">
-            <span class="badge-label">Atıf</span>
-            <span class="badge-count">${art.citation_count ?? 0}</span>
-          </div>
-          <div class="result-body">
-            <div style="font-weight: 600; font-size: 1rem;">${art.title}</div>
-            <div class="article-meta">${art.publication_name || 'Dergi Yok'} · ${art.cover_date || ''}</div>
-            ${art.doi ? `<a href="https://doi.org/${art.doi}" target="_blank" style="font-size: 0.85rem; color: #0284c7;">DOI: ${art.doi}</a>` : ''}
-          </div>
+      container.innerHTML = `
+        <div style="margin-bottom: 8px; font-size: 0.85rem; color: #64748b;">
+          <strong>Scopus Author ID:</strong> ${data.scopus_author_id || 'Yok'} · 
+          <strong>Toplam Yayın:</strong> ${data.articles.length}
         </div>
-      `).join('');
+        <div class="results-list">
+          ${data.articles.map(art => `
+            <div class="result-item" style="background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 8px;">
+              <div class="seal-badge">
+                <span class="badge-label">Atıf</span>
+                <span class="badge-count">${art.citation_count ?? 0}</span>
+              </div>
+              <div class="result-body">
+                <div style="font-weight: 600; font-size: 0.95rem;">${art.title}</div>
+                <div class="article-meta" style="font-size: 0.85rem;">${art.publication_name || 'Dergi Yok'} · ${art.cover_date || ''}</div>
+                ${art.doi ? `<a href="https://doi.org/${art.doi}" target="_blank" style="font-size: 0.85rem; color: #0284c7;">DOI: ${art.doi}</a>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
     }
-
-    academicDetailPanel.scrollIntoView({ behavior: 'smooth' });
-
   } catch (err) {
-    articlesContainer.innerHTML = `<div class="empty-state error">Yayın detayları alınamadı.</div>`;
+    container.innerHTML = `<div class="empty-state error" style="padding: 12px 0;">Yayın detayları alınamadı.</div>`;
   }
 }
 
@@ -535,8 +683,9 @@ async function runSearch() {
   const rawQuery = searchInput.value.trim();
   const query = trLower(rawQuery);
 
-  if (!query) {
-    showEmpty('Lütfen aramak için bir kelime girin.', true);
+  // EĞER kelime girilmemişse ve "Son 30 Gün" SEÇİLMEMİŞSE uyarı ver:
+  if (!query && !recent30Days.checked) {
+    showEmpty('Lütfen aramak için bir kelime girin veya "Son 30 Gün" filtresini seçin.', true);
     return;
   }
 
@@ -544,7 +693,7 @@ async function runSearch() {
   searchBtn.disabled = true;
 
   try {
-    let url = `${API_BASE_URL}/api/articles?limit=200`;
+    let url = `${API_BASE_URL}/api/articles?limit=500`; // Limit artırıldı
 
     if (sortCitations.checked) url += `&sort_by_citations=true`;
     if (onlyFirat && onlyFirat.checked) url += `&only_firat=true`;
@@ -552,7 +701,7 @@ async function runSearch() {
     if (filterMonth.value) url += `&month=${filterMonth.value}`;
 
     const filterType = searchType.value;
-    if (filterType === 'journal') {
+    if (filterType === 'journal' && query) {
       url += `&journal=${encodeURIComponent(rawQuery)}`;
     }
 
@@ -563,18 +712,35 @@ async function runSearch() {
     const minCount = Number(minCitations.value);
 
     const filtered = data.filter(article => {
-      const titleMatch = trLower(article.art_name).includes(query);
-      const journalMatch = trLower(article.publication_name).includes(query);
-      const authorsList = article.authors
-        ? article.authors.map(a => trLower(a.auth_fullname)).join(' ')
-        : '';
-      const authorMatch = authorsList.includes(query);
+      let matchesQuery = true;
+      
+      // Eğer kelime girilmişse arama yap
+      if (query) {
+        const titleMatch = trLower(article.art_name).includes(query);
+        const journalMatch = trLower(article.publication_name).includes(query);
+        const authorsList = article.authors
+          ? article.authors.map(a => trLower(a.auth_fullname)).join(' ')
+          : '';
+        const authorMatch = authorsList.includes(query);
 
-      let matchesQuery;
-      if (filterType === 'title') matchesQuery = titleMatch;
-      else if (filterType === 'author') matchesQuery = authorMatch;
-      else if (filterType === 'journal') matchesQuery = journalMatch;
-      else matchesQuery = titleMatch || journalMatch || authorMatch;
+        if (filterType === 'title') matchesQuery = titleMatch;
+        else if (filterType === 'author') matchesQuery = authorMatch;
+        else if (filterType === 'journal') matchesQuery = journalMatch;
+        else matchesQuery = titleMatch || journalMatch || authorMatch;
+      }
+
+      // Eğer "Son 30 Gün" işaretliyse tarih kontrolü yap
+      if (recent30Days.checked) {
+        if (!article.cover_date) return false;
+        
+        const pubDate = new Date(article.cover_date);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        if (isNaN(pubDate) || pubDate < thirtyDaysAgo) {
+          return false;
+        }
+      }
 
       return matchesQuery && (Number(article.citedby_count) || 0) >= minCount;
     });
