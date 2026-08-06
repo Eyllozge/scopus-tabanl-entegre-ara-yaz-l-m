@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from dotenv import load_dotenv
 import requests
 import pandas as pd
 from datetime import datetime, date
@@ -8,14 +9,16 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 import crud as crud
-from models import Article, Academic  # Veritabanı modellerinize göre düzenleyebilirsiniz
+from models import Article, Academic
+
+load_dotenv()
 
 # Genel ayarlar
 ENABLE_SCOPUS_FETCH = os.getenv("ENABLE_SCOPUS_FETCH", "false").lower() == "true"
 SYNC_SOURCE = "scopus"
-PAGE_SIZE = 25          # Scopus Search API sayfa boyutu
-FRESHNESS_DAYS = 30     # Bu kadar günden yeni bir senkron varsa Scopus'a hiç gitme
-OPENALEX_MAILTO = os.getenv("OPENALEX_MAILTO")  # opsiyonel - OpenAlex "polite pool" için
+PAGE_SIZE = 25
+FRESHNESS_DAYS = 30
+OPENALEX_MAILTO = os.getenv("OPENALEX_MAILTO")
 
 # Çoklu Scopus API key geçişi
 _raw_keys = os.getenv("SCP_API_KEYS") or os.getenv("SCP_API", "")
@@ -26,7 +29,6 @@ SCOPUS_SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
 SCOPUS_ABSTRACT_BY_SCOPUS_ID_URL = "https://api.elsevier.com/content/abstract/scopus_id"
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 
-# AFFIL sorgusu (Yedek veya Genel Arama için)
 FIRAT_QUERY = 'AFFIL("Firat Universitesi") OR AFFIL("Firat University")'
 
 
@@ -68,7 +70,6 @@ def _scopus_get(url: str, params: dict) -> Optional[dict]:
 
 
 def fetch_scopus_search(query: str, start: int = 0, count: int = PAGE_SIZE) -> Optional[dict]:
-    # Belirtilen parametre alanları ile Scopus Search API isteği atar
     params = {
         "query": query,
         "start": start,
@@ -82,12 +83,7 @@ def fetch_scopus_full_record(scopus_id: str) -> Optional[dict]:
     return _scopus_get(f"{SCOPUS_ABSTRACT_BY_SCOPUS_ID_URL}/{scopus_id}", {"httpAccept": "application/json"})
 
 
-# =========================================================================
-# YENİ EKLENEN KISIM: Excel Dosyasından Scopus Author ID'leri Çekme
-# =========================================================================
-
 def extract_author_id_from_url(url: str) -> Optional[str]:
-    """'https://www.scopus.com/authid/detail.uri?authorId=58022157500' linkinden ID'yi ayıklar."""
     if not url or pd.isna(url):
         return None
     match = re.search(r'authorId=(\d+)', str(url))
@@ -95,10 +91,6 @@ def extract_author_id_from_url(url: str) -> Optional[str]:
 
 
 def get_scopus_author_ids_from_excel(file_path: str = "abs_public_pbs_users.xlsx") -> list[dict]:
-    """
-    Excel dosyasını okur, geçerli scopus_link olan akademisyenlerin
-    Ad, Soyad, Email ve Scopus Author ID bilgilerini liste olarak döndürür.
-    """
     if not os.path.exists(file_path):
         print(f"[HATA] Excel dosyası bulunamadı: {file_path}")
         return []
@@ -109,9 +101,14 @@ def get_scopus_author_ids_from_excel(file_path: str = "abs_public_pbs_users.xlsx
             return []
 
         academics = []
+        seen_author_ids = set()
+
         for _, row in df.dropna(subset=['scopus_link']).iterrows():
             author_id = extract_author_id_from_url(row['scopus_link'])
-            if author_id:
+            
+            # Mükerrer Scopus ID okumasını engelle
+            if author_id and author_id not in seen_author_ids:
+                seen_author_ids.add(author_id)
                 academics.append({
                     "first_name": row.get('personelAd'),
                     "last_name": row.get('personelSoyad'),
@@ -127,10 +124,6 @@ def get_scopus_author_ids_from_excel(file_path: str = "abs_public_pbs_users.xlsx
 
 
 def discover_scopus_ids_by_author(author_id: str, since: Optional[date] = None) -> list[dict]:
-    """
-    Belirli bir akademisyenin Scopus Author ID'si (AU-ID) ile Scopus'taki tüm yayınlarını arar.
-    AU-ID(authorId) sorgusu kullanır.
-    """
     query = f"AU-ID({author_id})"
     if since:
         query = f"({query}) AND LOAD-DATE AFT {since.strftime('%Y%m%d')}"
@@ -150,7 +143,7 @@ def discover_scopus_ids_by_author(author_id: str, since: Optional[date] = None) 
             scopus_id = (e.get("dc:identifier") or "").replace("SCOPUS_ID:", "")
             if not scopus_id:
                 continue
-            
+
             results.append({
                 "scopus_id": scopus_id,
                 "doi": e.get("prism:doi"),
@@ -168,10 +161,6 @@ def discover_scopus_ids_by_author(author_id: str, since: Optional[date] = None) 
 
     return results
 
-
-# =========================================================================
-# Mevcut Yardımcı ve İşleyici Fonksiyonlar (OpenAlex & Scopus Fallback)
-# =========================================================================
 
 def _is_firat_name(name: str) -> bool:
     if not name:
@@ -341,16 +330,7 @@ def _save_article(db: Session, scopus_id: str, doi: str, citedby_count: int, met
     )
 
 
-# =========================================================================
-# Güncellenmiş Senkronizasyon Akışı
-# =========================================================================
-
 def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = False, excel_path: str = "abs_public_pbs_users.xlsx"):
-    """
-    1) Excel dosyasından akademisyenlerin Scopus Author ID'lerini okur.
-    2) Her bir Scopus Author ID için `AU-ID(...)` sorgusu ile Scopus'tan makaleleri keşfeder.
-    3) OpenAlex / Scopus Fallback ile künyeleri tamamlayıp veritabanına kaydeder.
-    """
     if not ENABLE_SCOPUS_FETCH:
         print("ENABLE_SCOPUS_FETCH kapalı, senkronizasyon atlandı.")
         return
@@ -359,7 +339,6 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
         print(f"Son senkron {FRESHNESS_DAYS} günden yeni, Scopus'a hiç istek atılmadı - DB'deki veri kullanılıyor.")
         return
 
-    # Excel'deki akademisyenleri çek
     academics = get_scopus_author_ids_from_excel(excel_path)
     if not academics:
         print("[UYARI] İşlenecek Scopus Author ID bulunamadı.")
@@ -373,21 +352,38 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
         since = last_sync.run_at.date() if last_sync else None
 
     discovered = []
-    # Her akademisyenin yayınlarını `AU-ID(authorId)` sorgusuyla çek
     for idx, academic in enumerate(academics, 1):
         author_id = academic["scopus_author_id"]
         print(f"[{idx}/{len(academics)}] Akademisyen taranıyor: {academic['first_name']} {academic['last_name']} (AU-ID: {author_id})")
-        
-        # Akademisyeni veritabanına/akademisyen tablosuna kaydet
-        crud.get_or_create_academic(
-            db=db,
-            first_name=academic["first_name"],
-            last_name=academic["last_name"],
-            email=academic["email"],
-            faculty=academic["faculty"],
+
+        full_name = f"{academic['first_name']} {academic['last_name']}".strip()
+        faculty_obj = crud.get_or_create_faculty(db, academic["faculty"] or "Belirtilmemiş")
+        academic_obj = crud.upsert_academic(
+            db,
+            full_name=full_name,
+            faculty_id=faculty_obj.id,
             department=academic["department"],
-            scopus_author_id=author_id
+            email=academic["email"],
         )
+        
+        author_obj = crud.get_or_create_author(
+            db, full_name, scopus_author_id=author_id, is_firat_academic=True
+        )
+        
+        if academic_obj.author_id != author_obj.id:
+            conflict = (
+                db.query(Academic)
+                .filter(Academic.author_id == author_obj.id, Academic.id != academic_obj.id)
+                .first()
+            )
+            if conflict:
+                print(
+                    f"[UYARI] Author ID {author_obj.id} zaten '{conflict.full_name}' "
+                    f"akademisyenine bağlı, '{full_name}' için bağlama atlandı (muhtemel isim çakışması)."
+                )
+            else:
+                academic_obj.author_id = author_obj.id
+                db.commit()
 
         author_articles = discover_scopus_ids_by_author(author_id, since=since)
         discovered.extend(author_articles)
@@ -397,7 +393,6 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
         print("Yeni veya güncellenmiş makale yok, senkronizasyon tamamlandı.")
         return
 
-    # Tekil Scopus ID'leri al (birden fazla Fıratlı yazarı olan makaleler mükerrer olmasın)
     unique_discovered = {item["scopus_id"]: item for item in discovered}.values()
 
     existing = {

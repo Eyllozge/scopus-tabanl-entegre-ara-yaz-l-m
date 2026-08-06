@@ -73,6 +73,7 @@ FACULTY_SUBDOMAINS = {
     "otomotivmf": ("Teknoloji Fakültesi", "Fakülte"),
     "yazilimtf": ("Teknoloji Fakültesi", "Fakülte"),
     "yazilimmuholp": ("Teknoloji Fakültesi", "Fakülte"),
+    "ddyo": ("Dijital Dönüşüm ve Yazılım Ofisi", "Yüksekokul"),
     
     # "saglikf": ("Sağlık Bilimleri Fakültesi", "Fakülte"),
     # "sporbilimlerif": ("Spor Bilimleri Fakültesi", "Fakülte"),

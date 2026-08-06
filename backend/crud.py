@@ -4,13 +4,26 @@ from sqlalchemy.orm import Session, joinedload
 from models import Article, Author, Faculty, Academic, Institution, SyncLog
 
 
+def _normalize_tr(text: str) -> str:
+    """Türkçe karakter/case farklarından bağımsız karşılaştırma için normalize eder."""
+    n = (text or "").lower()
+    for a, b in [("ı", "i"), ("i̇", "i"), ("ü", "u"), ("ö", "o"), ("ş", "s"), ("ç", "c"), ("ğ", "g")]:
+        n = n.replace(a, b)
+    return n
+
+
 def get_or_create_author(db: Session, full_name: str, scopus_author_id: str = None, is_firat_academic: bool = False):
     author = None
     if scopus_author_id:
         author = db.query(Author).filter(Author.scopus_author_id == scopus_author_id).first()
 
     if not author:
-        author = db.query(Author).filter(Author.auth_fullname == full_name).first()
+        target = _normalize_tr(full_name)
+        candidates = db.query(Author).all()
+        for c in candidates:
+            if _normalize_tr(c.auth_fullname) == target:
+                author = c
+                break
         if author and scopus_author_id and not author.scopus_author_id:
             author.scopus_author_id = scopus_author_id
 
@@ -35,7 +48,12 @@ def get_or_create_institution(
         ).first()
 
     if not institution:
-        institution = db.query(Institution).filter(Institution.institution_name == name).first()
+        target = _normalize_tr(name)
+        candidates = db.query(Institution).all()
+        for c in candidates:
+            if _normalize_tr(c.institution_name) == target:
+                institution = c
+                break
         if institution and scopus_affiliation_id and not institution.scopus_affiliation_id:
             institution.scopus_affiliation_id = scopus_affiliation_id
 
@@ -65,6 +83,11 @@ def upsert_article(
     abstract: str = None, keywords: str = None, metadata_source: str = None,
 ):
     article = db.query(Article).filter(Article.scopus_id == scopus_id).first()
+    if not article and doi:
+        article = db.query(Article).filter(Article.doi == doi).first()
+        if article and not article.scopus_id:
+            article.scopus_id = scopus_id
+
     if article:
         article.citedby_count = citedby_count
         article.abstract = abstract or article.abstract
@@ -84,6 +107,7 @@ def upsert_article(
         article.authors = author_objs
         article.institutions = institution_objs
         db.add(article)
+
     db.commit()
     db.refresh(article)
     return article
@@ -120,7 +144,6 @@ def is_data_fresh(db: Session, source: str, days: int) -> bool:
 
 
 def list_faculties(db: Session):
-    """Fakülte filtre dropdown'u için tüm fakülteleri (akademisyen sayısıyla) döndürür."""
     from sqlalchemy import func as sa_func
     rows = (
         db.query(Faculty, sa_func.count(Academic.id).label("academic_count"))
@@ -133,12 +156,24 @@ def list_faculties(db: Session):
 
 
 def get_or_create_faculty(db: Session, name: str, unit_type: str = None, source_subdomain: str = None):
-    faculty = db.query(Faculty).filter(Faculty.name == name).first()
+    target = _normalize_tr(name)
+    candidates = db.query(Faculty).all()
+    faculty = None
+    for c in candidates:
+        if _normalize_tr(c.name) == target:
+            faculty = c
+            break
+
     if not faculty:
         faculty = Faculty(name=name, unit_type=unit_type, source_subdomain=source_subdomain)
         db.add(faculty)
         db.commit()
         db.refresh(faculty)
+    else:
+        if source_subdomain and not faculty.source_subdomain:
+            faculty.source_subdomain = source_subdomain
+            db.commit()
+
     return faculty
 
 
@@ -147,21 +182,36 @@ def upsert_academic(
     department: str = None, email: str = None, orcid: str = None,
     yok_author_id: str = None
 ):
-    academic = db.query(Academic).filter(
-        Academic.full_name == full_name, Academic.faculty_id == faculty_id
-    ).first()
+    target_name = _normalize_tr(full_name)
+    
+    # Fakülte ID'sine bakmaksızın tüm akademisyenlerde isme göre arıyoruz
+    candidates = db.query(Academic).all()
+    academic = None
+    
+    for cand in candidates:
+        if _normalize_tr(cand.full_name) == target_name:
+            academic = cand
+            break
+
     if academic:
+        # Var olan profili güncelle (Dolu olan verilerin üzerine boş veri yazma)
         academic.title = title or academic.title
         academic.department = department or academic.department
         academic.email = email or academic.email
         academic.orcid = orcid or academic.orcid
         academic.yok_author_id = yok_author_id or academic.yok_author_id
+        
+        # Eğer hocanın şu anki fakültesi "Belirtilmemiş" ise ve yeni gelen fakülte farklıysa onu da güncelle
+        if academic.faculty and academic.faculty.name == "Belirtilmemiş" and faculty_id:
+            academic.faculty_id = faculty_id
     else:
+        # Gerçekten yeni biriyse sıfırdan oluştur
         academic = Academic(
             full_name=full_name, faculty_id=faculty_id, title=title,
             department=department, email=email, orcid=orcid, yok_author_id=yok_author_id,
         )
         db.add(academic)
+
     db.commit()
     db.refresh(academic)
     return academic
@@ -202,22 +252,7 @@ def match_academics_to_authors(db: Session):
     return matched
 
 
-def _normalize_tr(text: str) -> str:
-    """Türkçe karakter/case farklarından bağımsız karşılaştırma için normalize eder.
-    (ILIKE bazı veritabanı locale'lerinde 'İ/I/ı/i' gibi Türkçe harfleri doğru
-    küçültmediği için var olan bir kayıt bile bulunamıyordu; bu yüzden karşılaştırma
-    Python tarafında, karakter eşlemesiyle yapılıyor.)"""
-    n = (text or "").lower()
-    for a, b in [("ı", "i"), ("i̇", "i"), ("ü", "u"), ("ö", "o"), ("ş", "s"), ("ç", "c"), ("ğ", "g")]:
-        n = n.replace(a, b)
-    return n
-
-
 def search_academics(db: Session, query: str = None, faculty_id: int = None):
-    """Hoca adına ve/veya fakülteye göre arama yapar.
-    - query: ad/soyada göre (Türkçe karakterlere duyarsız) serbest metin arama
-    - faculty_id: seçilen fakülteye göre kesin filtre
-    """
     base = db.query(Academic).options(joinedload(Academic.faculty), joinedload(Academic.author))
     if faculty_id:
         base = base.filter(Academic.faculty_id == faculty_id)
@@ -236,7 +271,6 @@ def search_academics(db: Session, query: str = None, faculty_id: int = None):
 
 
 def get_academic_with_publications(db: Session, academic_id: int):
-    """Seçilen hocanın bilgilerini, fakültesini ve Author ilişkisi üzerinden Scopus makalelerini getirir."""
     academic = (
         db.query(Academic)
         .options(joinedload(Academic.faculty), joinedload(Academic.author))
@@ -250,7 +284,6 @@ def get_academic_with_publications(db: Session, academic_id: int):
     articles = []
     scopus_author_id = None
 
-    # Academic -> Author ilişkisi kontrolü hata alınca genelde burdan yanlış eşleşme oluyor
     if academic.author:
         scopus_author_id = academic.author.scopus_author_id
         if hasattr(academic.author, "articles"):
