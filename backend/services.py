@@ -1,24 +1,23 @@
 import os
+import re
 import time
 import requests
+import pandas as pd
 from datetime import datetime, date
 from typing import Optional
 from sqlalchemy.orm import Session
 
 import crud as crud
-from models import Article
+from models import Article, Academic  # Veritabanı modellerinize göre düzenleyebilirsiniz
 
-#Genel ayarlar
+# Genel ayarlar
 ENABLE_SCOPUS_FETCH = os.getenv("ENABLE_SCOPUS_FETCH", "false").lower() == "true"
 SYNC_SOURCE = "scopus"
 PAGE_SIZE = 25          # Scopus Search API sayfa boyutu
 FRESHNESS_DAYS = 30     # Bu kadar günden yeni bir senkron varsa Scopus'a hiç gitme
 OPENALEX_MAILTO = os.getenv("OPENALEX_MAILTO")  # opsiyonel - OpenAlex "polite pool" için
 
-#Çoklu Scopus API key geçişi
-# .env'de SCP_API_KEYS="key1,key2,key3" (virgülle ayrılmış). Tanımlı
-# değilse eski tekil SCP_API'ye düşer. Bir key 429 (rate limit) alırsa
-# otomatik sıradaki key'e geçilir.
+# Çoklu Scopus API key geçişi
 _raw_keys = os.getenv("SCP_API_KEYS") or os.getenv("SCP_API", "")
 SCP_API_KEYS = [k.strip() for k in _raw_keys.split(",") if k.strip()]
 _current_key_index = 0
@@ -27,7 +26,7 @@ SCOPUS_SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
 SCOPUS_ABSTRACT_BY_SCOPUS_ID_URL = "https://api.elsevier.com/content/abstract/scopus_id"
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 
-# AFFIL sorgusu kullanılıyor. Fırat Üniversitesi hem Türkçe hem İngilizce yazımla kayıtlı
+# AFFIL sorgusu (Yedek veya Genel Arama için)
 FIRAT_QUERY = 'AFFIL("Firat Universitesi") OR AFFIL("Firat University")'
 
 
@@ -69,48 +68,74 @@ def _scopus_get(url: str, params: dict) -> Optional[dict]:
 
 
 def fetch_scopus_search(query: str, start: int = 0, count: int = PAGE_SIZE) -> Optional[dict]:
-    return _scopus_get(SCOPUS_SEARCH_URL, {"query": query, "start": start, "count": count})
+    # Belirtilen parametre alanları ile Scopus Search API isteği atar
+    params = {
+        "query": query,
+        "start": start,
+        "count": count,
+        "field": "eid,dc:title,prism:coverDate,dc:creator,author,citedby-count,subtype,subtypeDescription,link,prism:doi,dc:identifier"
+    }
+    return _scopus_get(SCOPUS_SEARCH_URL, params)
 
 
 def fetch_scopus_full_record(scopus_id: str) -> Optional[dict]:
-    #SADECE OpenAlex'te kaydı olmayan makaleler için yedek künye kaynağı olarak kullanılır (sync_scopus_data).
     return _scopus_get(f"{SCOPUS_ABSTRACT_BY_SCOPUS_ID_URL}/{scopus_id}", {"httpAccept": "application/json"})
 
 
-def _is_firat_name(name: str) -> bool:
-    #Firat University' / 'Fırat Üniversitesi' gibi yazım farklarının yakalayan isim eşleştirmesi.
-    if not name:
-        return False
+# =========================================================================
+# YENİ EKLENEN KISIM: Excel Dosyasından Scopus Author ID'leri Çekme
+# =========================================================================
 
-    normalized = (
-        name.lower()
-        .replace("ı", "i")
-        .replace("ü", "u")
-        .replace("ö", "o")
-        .replace("ş", "s")
-        .replace("ç", "c")
-        .replace("ğ", "g")
-    )
-    return "firat" in normalized
-
-def _has_firat_affiliation(entry: dict) -> bool:
-    #Scopus arama sonucundaki affiliation bloğunda gerçek bir Fırat üni eşleşmesi var mı (New jersey ya da suudi arabistan verileri gelmesin)
-    affil_block = entry.get("affiliation", [])
-    if isinstance(affil_block, dict):
-        affil_block = [affil_block]
-    return any(_is_firat_name(a.get("affilname", "")) for a in affil_block)
+def extract_author_id_from_url(url: str) -> Optional[str]:
+    """'https://www.scopus.com/authid/detail.uri?authorId=58022157500' linkinden ID'yi ayıklar."""
+    if not url or pd.isna(url):
+        return None
+    match = re.search(r'authorId=(\d+)', str(url))
+    return match.group(1) if match else None
 
 
-#1. sadece Scopus'tan id + atıf sayısı
-def discover_scopus_ids(since: Optional[date] = None) -> list[dict]:
+def get_scopus_author_ids_from_excel(file_path: str = "abs_public_pbs_users.xlsx") -> list[dict]:
+    """
+    Excel dosyasını okur, geçerli scopus_link olan akademisyenlerin
+    Ad, Soyad, Email ve Scopus Author ID bilgilerini liste olarak döndürür.
+    """
+    if not os.path.exists(file_path):
+        print(f"[HATA] Excel dosyası bulunamadı: {file_path}")
+        return []
 
-    #Fırat Üniversitesi'ne bağlı Scopus kayıtlarını tarar:
-    query = FIRAT_QUERY
+    try:
+        df = pd.read_excel(file_path)
+        if 'scopus_link' not in df.columns:
+            return []
+
+        academics = []
+        for _, row in df.dropna(subset=['scopus_link']).iterrows():
+            author_id = extract_author_id_from_url(row['scopus_link'])
+            if author_id:
+                academics.append({
+                    "first_name": row.get('personelAd'),
+                    "last_name": row.get('personelSoyad'),
+                    "email": row.get('personelKurumemail'),
+                    "faculty": row.get('personelBirim'),
+                    "department": row.get('personelBolum'),
+                    "scopus_author_id": author_id
+                })
+        return academics
+    except Exception as e:
+        print(f"[HATA] Excel okunurken hata oluştu: {e}")
+        return []
+
+
+def discover_scopus_ids_by_author(author_id: str, since: Optional[date] = None) -> list[dict]:
+    """
+    Belirli bir akademisyenin Scopus Author ID'si (AU-ID) ile Scopus'taki tüm yayınlarını arar.
+    AU-ID(authorId) sorgusu kullanır.
+    """
+    query = f"AU-ID({author_id})"
     if since:
         query = f"({query}) AND LOAD-DATE AFT {since.strftime('%Y%m%d')}"
 
     results = []
-    skipped = 0
     start = 0
     while True:
         data = fetch_scopus_search(query, start=start, count=PAGE_SIZE)
@@ -122,17 +147,17 @@ def discover_scopus_ids(since: Optional[date] = None) -> list[dict]:
             break
 
         for e in entries:
-            if not _has_firat_affiliation(e):
-                skipped += 1
-                continue
-
             scopus_id = (e.get("dc:identifier") or "").replace("SCOPUS_ID:", "")
             if not scopus_id:
                 continue
+            
             results.append({
                 "scopus_id": scopus_id,
                 "doi": e.get("prism:doi"),
                 "citedby_count": int(e.get("citedby-count", 0) or 0),
+                "title": e.get("dc:title"),
+                "cover_date": e.get("prism:coverDate"),
+                "author_id": author_id
             })
 
         total_results = int(data.get("search-results", {}).get("opensearch:totalResults", 0))
@@ -141,15 +166,25 @@ def discover_scopus_ids(since: Optional[date] = None) -> list[dict]:
             break
         time.sleep(0.2)
 
-    if skipped:
-        print(f"[BİLGİ] {skipped} kayıt elendi (gerçek Fırat eşleşmesi yok).")
-
     return results
 
 
-#2. Künye için OpenAlex
+# =========================================================================
+# Mevcut Yardımcı ve İşleyici Fonksiyonlar (OpenAlex & Scopus Fallback)
+# =========================================================================
+
+def _is_firat_name(name: str) -> bool:
+    if not name:
+        return False
+    normalized = (
+        name.lower()
+        .replace("ı", "i").replace("ü", "u").replace("ö", "o")
+        .replace("ş", "s").replace("ç", "c").replace("ğ", "g")
+    )
+    return "firat" in normalized
+
+
 def fetch_openalex_work(doi: str) -> Optional[dict]:
-    #DOI ile OpenAlex'ten tam künye çeker.
     if not doi:
         return None
     try:
@@ -179,9 +214,7 @@ def _reconstruct_abstract(inverted_index: Optional[dict]) -> Optional[str]:
 
 
 def _parse_openalex_work(work: dict) -> dict:
-    #OpenAlex work kısmını  iç formata çevirir.
     title = work.get("title") or work.get("display_name") or "Bilinmeyen Başlık"
-
     source = (work.get("primary_location") or {}).get("source") or {}
     publication_name = source.get("display_name") or "Bilinmeyen Dergi"
 
@@ -232,7 +265,6 @@ def _parse_openalex_work(work: dict) -> dict:
     }
 
 
-#3. open alexten künye bulunmazsa scopustan mecburi çekiş
 def _parse_scopus_fallback(scopus_data: dict) -> dict:
     coredata = scopus_data.get("abstracts-retrieval-response", {}).get("coredata", {})
 
@@ -279,7 +311,6 @@ def _parse_scopus_fallback(scopus_data: dict) -> dict:
     }
 
 
-#4. Kayıt
 def _save_article(db: Session, scopus_id: str, doi: str, citedby_count: int, meta: dict, metadata_source: str):
     author_objs = [
         crud.get_or_create_author(
@@ -301,7 +332,7 @@ def _save_article(db: Session, scopus_id: str, doi: str, citedby_count: int, met
         publication_name=meta["publication_name"],
         cover_date=meta["cover_date"],
         doi=doi,
-        citedby_count=citedby_count,  # her zaman Scopus'tan alınıyor
+        citedby_count=citedby_count,
         author_objs=author_objs,
         institution_objs=institution_objs,
         abstract=meta["abstract"],
@@ -310,18 +341,15 @@ def _save_article(db: Session, scopus_id: str, doi: str, citedby_count: int, met
     )
 
 
-#5. Akış ve senkronizasyon
-def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = False):
-    """!!!!!!!!!!!!!!!!
-    Akış:
-      0) Freshness kontrolü: force=False ve son başarılı senkron
-         FRESHNESS_DAYS'ten yeniyse hiçbir dış çağrı yapılmadan çıkılır -
-         veri zaten DB'de, endpoint'ler oradan cevap verir.
-      1) discover_scopus_ids  -> ucuz Scopus Search: id + doi + atıf sayısı
-      2) yeni ya da atıf sayısı değişen her kayıt için:
-         a) künye ÖNCE OpenAlex'ten (DOI ile) denenir
-         b) OpenAlex'te yoksa Scopus abstract retrieval'a (pahalı) düşülür
-      3) atıf sayısı HER ZAMAN Scopus'tan gelir (adım 1'deki citedby_count)
+# =========================================================================
+# Güncellenmiş Senkronizasyon Akışı
+# =========================================================================
+
+def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = False, excel_path: str = "abs_public_pbs_users.xlsx"):
+    """
+    1) Excel dosyasından akademisyenlerin Scopus Author ID'lerini okur.
+    2) Her bir Scopus Author ID için `AU-ID(...)` sorgusu ile Scopus'tan makaleleri keşfeder.
+    3) OpenAlex / Scopus Fallback ile künyeleri tamamlayıp veritabanına kaydeder.
     """
     if not ENABLE_SCOPUS_FETCH:
         print("ENABLE_SCOPUS_FETCH kapalı, senkronizasyon atlandı.")
@@ -331,22 +359,51 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
         print(f"Son senkron {FRESHNESS_DAYS} günden yeni, Scopus'a hiç istek atılmadı - DB'deki veri kullanılıyor.")
         return
 
+    # Excel'deki akademisyenleri çek
+    academics = get_scopus_author_ids_from_excel(excel_path)
+    if not academics:
+        print("[UYARI] İşlenecek Scopus Author ID bulunamadı.")
+        return
+
+    print(f"[BİLGİ] Toplam {len(academics)} akademisyen için Scopus taraması başlatılıyor...")
+
     since = None
     if not full_backfill:
         last_sync = crud.get_last_sync(db, SYNC_SOURCE)
         since = last_sync.run_at.date() if last_sync else None
 
-    discovered = discover_scopus_ids(since=since)
+    discovered = []
+    # Her akademisyenin yayınlarını `AU-ID(authorId)` sorgusuyla çek
+    for idx, academic in enumerate(academics, 1):
+        author_id = academic["scopus_author_id"]
+        print(f"[{idx}/{len(academics)}] Akademisyen taranıyor: {academic['first_name']} {academic['last_name']} (AU-ID: {author_id})")
+        
+        # Akademisyeni veritabanına/akademisyen tablosuna kaydet
+        crud.get_or_create_academic(
+            db=db,
+            first_name=academic["first_name"],
+            last_name=academic["last_name"],
+            email=academic["email"],
+            faculty=academic["faculty"],
+            department=academic["department"],
+            scopus_author_id=author_id
+        )
+
+        author_articles = discover_scopus_ids_by_author(author_id, since=since)
+        discovered.extend(author_articles)
+
     if not discovered:
-        crud.log_sync_run(db, source=SYNC_SOURCE, status="success", records_fetched=0,
-                           note="Yeni/güncellenmiş kayıt bulunamadı.")
+        crud.log_sync_run(db, source=SYNC_SOURCE, status="success", records_fetched=0, note="Yeni/güncellenmiş kayıt bulunamadı.")
         print("Yeni veya güncellenmiş makale yok, senkronizasyon tamamlandı.")
         return
+
+    # Tekil Scopus ID'leri al (birden fazla Fıratlı yazarı olan makaleler mükerrer olmasın)
+    unique_discovered = {item["scopus_id"]: item for item in discovered}.values()
 
     existing = {
         a.scopus_id: a.citedby_count
         for a in db.query(Article)
-        .filter(Article.scopus_id.in_([d["scopus_id"] for d in discovered]))
+        .filter(Article.scopus_id.in_([d["scopus_id"] for d in unique_discovered]))
         .all()
     }
 
@@ -355,17 +412,15 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
     total_fallback = 0
     total_failed = 0
 
-    for item in discovered:
+    for item in unique_discovered:
         scopus_id = item["scopus_id"]
         doi = item["doi"]
         is_new = scopus_id not in existing
         citation_changed = (not is_new) and existing[scopus_id] != item["citedby_count"]
 
         if not is_new and not citation_changed:
-            continue  # değişen bir şey yok
+            continue
 
-        # Sadece atıf sayısı değiştiyse künyeyi yeniden çekmeye gerek yok,
-        # var olan künye korunup sadece citedby_count güncellenir.
         if citation_changed and not is_new:
             crud.upsert_article(
                 db=db, scopus_id=scopus_id, art_name=None, publication_name=None,
@@ -400,8 +455,7 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
 
     crud.log_sync_run(
         db, source=SYNC_SOURCE, status="success", records_fetched=total_processed,
-        note=(f"full_backfill={full_backfill}, taranan={len(discovered)}, "
+        note=(f"full_backfill={full_backfill}, taranan={len(unique_discovered)}, "
               f"openalex={total_openalex}, scopus_fallback={total_fallback}, basarisiz={total_failed}"),
     )
-    print(f"Senkronizasyon tamamlandı: {total_processed} makale işlendi "
-          f"(openalex={total_openalex}, scopus_fallback={total_fallback}, başarısız={total_failed}).")
+    print(f"Senkronizasyon tamamlandı: {total_processed} makale işlendi.")
