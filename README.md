@@ -1,3 +1,4 @@
+<img width="1917" height="902" alt="makale arama" src="https://github.com/user-attachments/assets/59da112e-8480-48b4-97e9-055500471f68" />
 # Fırat Akademik Atıf Sistemi (Scopus Entegre)
 
 Fırat Üniversitesi'nin Scopus'ta indekslenmiş akademik yayınlarını otomatik olarak takip eden, saklayan ve arama/raporlama arayüzüyle sunan bir sistem.
@@ -69,6 +70,9 @@ Sistem her 30 günde bir otomatik olarak çalışır:
 
 <img width="1917" height="885" alt="fakülte arama" src="https://github.com/user-attachments/assets/e4ae1d4e-d732-4818-b51e-78f94f638ecd" />
 
+<img width="1917" height="902" alt="makale arama" src="https://github.com/user-attachments/assets/da1f4909-f2b5-4e0d-be64-ea646000117b" />
+
+<img width="1917" height="867" alt="makale özet" src="https://github.com/user-attachments/assets/8de271d4-d2ec-4dc5-8c8f-3b7c7a06d369" />
 
 
 
