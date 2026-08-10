@@ -1,100 +1,78 @@
-# 🎓 Scopus Akademik Veri Entegrasyon Sistemi ve Paneli
+# Fırat Akademik Atıf Sistemi (Scopus Entegre)
 
-**Platform:** Web (Bağımsız Mikroservis Mimarisi)
+Fırat Üniversitesi'nin Scopus'ta indekslenmiş akademik yayınlarını otomatik olarak takip eden, saklayan ve arama/raporlama arayüzüyle sunan bir sistem.
 
----
+**Repo:** [github.com/Eyllozge/scopus-tabanl-entegre-ara-yaz-l-m](https://github.com/Eyllozge/scopus-tabanl-entegre-ara-yaz-l-m)
 
-## 📑 1. PROJE DOKÜMANTASYONU
+## Ne Yapıyor
 
-### Proje Özeti
-Bu proje, Fırat Üniversitesi akademisyenlerine ait Scopus tabanlı yayın ve atıf verilerinin manuel olarak takip edilmesi problemini çözmek amacıyla geliştirilmiş tam otomatik bir veri entegrasyon (ETL) sistemidir. Sistem, insan müdahalesine gerek duymadan belirli periyotlarla Scopus API'sine bağlanır, yeni verileri çeker, işler, veritabanına kaydeder ve bu verileri kurumsal kimliğe uygun, hızlı bir arayüz ile son kullanıcıya sunar.
+- Fırat Üniversitesi'ndeki tüm akademisyenleri, bağlı oldukları fakülte/yüksekokul/enstitüleri veritabanında tutar
+- Scopus ID'si olan yazarları akademisyen kayıtlarıyla eşleştirir
+- Makale arama, fakülte/akademisyen bazlı arama, akademisyenin yayın listesini görüntüleme
+- Fakülte bazlı yıllık/aylık yayın raporlaması (hangi fakülteden kaç makale, ulusal/uluslararası kırılım)
+- Dashboard: toplam yayın sayısı, toplam atıf sayısı, son 30 günde eklenen yayın sayısı
 
-### Temel Özellikler (İşlevsel Yetenekler)
-*   **Tam Otomatik Veri Toplama (Cron Job):** Sistem, arka planda çalışan zamanlanmış görevler (APScheduler) sayesinde her gece `03:00`'te otomatik olarak uyanır ve üniversitenin yeni yayınlarını tarar.
-*   **Akıllı Veri İşleme (Upsert Mantığı):** Aynı makale ikinci kez çekildiğinde veritabanında mükerrer kayıt oluşturulmaz; bunun yerine mevcut makalenin atıf sayısı (`citedby_count`) güncellenir.
-*   **Hata Toleransı (Silent Failure):** Scopus kaynaklı eksik veya hatalı veriler (örn. dergi adı olmayan makaleler) sistemi durdurmaz. Sistem arızalı veriyi atlayarak çalışmaya devam eder.
-*   **Dinamik Arama ve Filtreleme:** Arayüz üzerinden makale adı, yazar veya dergi ismine göre milisaniyeler içinde arama yapılabilir; sonuçlar atıf sayısına göre filtrelenebilir.
-*   **Doğrudan Yönlendirme:** Kullanıcılar arayüzdeki makale başlığına tıkladıklarında, ilgili makalenin orijinal Scopus sayfasına anında yönlendirilir.
+## Mimari
 
----
+Sistem tek bir kaynağa (Scopus) bağımlı kalıp kotayı tüketmemek için **freshness/cache + hibrit veri kaynağı** modeliyle çalışır:
 
-### Mimari Kararlar ve Kullanılan Teknolojiler
+1. **Freshness kontrolü** — bir yazarın son senkronu 30 günden yeniyse Scopus'a hiç istek atılmaz, veritabanından cevap verilir.
+2. **Künye bilgisi** (başlık, yazar, dergi, abstract) önce OpenAlex'ten (DOI ile) çekilir; OpenAlex'te yoksa Scopus abstract-retrieval endpoint'ine düşülür.
+3. **Atıf sayısı** her zaman doğrudan Scopus'tan gelir (tek doğru kaynak).
+4. Birden fazla Scopus API key tanımlanmıştır; 429 (kota) alındığında otomatik key rotasyonu yapılır.
+5. Fırat Üniversitesi ile ilişkisi olmayan ortak-yazarlı kurum/yazar kayıtları silinmez, `is_firat` / `is_firat_academic` alanlarıyla ayrı flag'lenir.
 
-**1. Veri ve Veritabanı Katmanı**
-*   **PostgreSQL & Neon:** Yüksek erişilebilirlik ve bulut entegrasyonu için veritabanı Neon üzerinde konumlandırılmıştır.
-*   **ORM (SQLAlchemy):** Makaleler, Yazarlar ve Kurumlar arasındaki karmaşık *Many-to-Many* (Çoka-Çok) ilişkiler SQLAlchemy ORM ile modellenmiştir. Veri tekrarı (redundancy) minimuma indirilmiştir.
+## Otomatik Senkronizasyon
 
-**2. Backend ve API Katmanı**
-*   **FastAPI & Pydantic:** Veri sunumu, yüksek performanslı ve asenkron yapısıyla bilinen FastAPI ile sağlanmıştır. Veriler, Pydantic DTO (Data Transfer Object) şemalarıyla doğrulanarak güvenli bir JSON formatında dışa aktarılır.
-*   **Performans Optimizasyonu:** Çoka-çok ilişkilerde sıkça karşılaşılan "N+1 Sorgu Problemi", SQLAlchemy'nin `joinedload` (Eager Loading) mimarisiyle çözülmüş ve API yanıt süreleri milisaniyeler seviyesine çekilmiştir.
-*   **Güvenlik:** API, farklı domainlerden (frontend arayüzünden) gelecek istekleri güvenli bir şekilde karşılayabilmek adına CORS (Cross-Origin Resource Sharing) izinleriyle yapılandırılmıştır.
+Sistem her 30 günde bir otomatik olarak çalışır:
+- Scopus'ta yeni yayın veya güncellenmiş atıf sayısı olup olmadığını kontrol eder
+- Sadece yeni/değişen kayıtlar için detay çağrısı yapar (tam yeniden çekim yok)
+- Tüm senkron işlemleri `SyncLog` tablosunda loglanır
 
-**3. Frontend (Önyüz) Katmanı**
-*   **Vanilla JS & CSS:** Sunucu yükünü artırmamak ve en yüksek performansı elde etmek adına ağır JavaScript framework'leri kullanılmamış; sistem saf HTML, CSS ve JavaScript (Fetch API) ile inşa edilmiştir.
-*   **Tasarım Dili:** Kurumsal kimliğe uygun, Fırat Üniversitesi renk kodlarını (bordo/maroon) ve "Atıf Mührü" (Seal) gibi akademik görsel bileşenleri barındıran özel bir UI tasarlanmıştır.
+## Teknoloji
 
-**4. Deployment (Canlıya Alma) Süreci**
-*   **Backend (Render.com):** Python API ve zamanlanmış görev (Cron) altyapısı, yapılandırılmış çevre değişkenleri (`.env`) ile Render bulut sunucularında canlıya alınmıştır.
-*   **Frontend (Vercel):** İstemci tarafı dosyaları (HTML/CSS), Vercel'in global CDN ağı üzerinde barındırılarak kullanıcılara sıfır gecikme ile sunulmaktadır.
+| Katman | Teknoloji |
+|---|---|
+| Backend | FastAPI |
+| Veritabanı | PostgreSQL (Neon) + (Local) |
+| ORM / Migration | SQLAlchemy + Alembic |
+| Frontend | HTML / CSS / JS |
+| Deploy | Backend: Render · Frontend: Vercel |
+| Harici API | Scopus API (Fırat Üniversitesi ULAKBİM EKUAL aboneliği), OpenAlex API |
 
----
+## Proje Yapısı
 
----
+```
+├── main.py          # FastAPI giriş noktası, /api route'ları
+├── models.py         # Article / Author / Institution / SyncLog modelleri
+├── crud.py           # Veritabanı işlemleri, freshness kontrolü
+├── schemas.py         # Pydantic şemaları
+├── services.py         # Scopus/OpenAlex entegrasyonu, senkron motoru
+├── database.py         # Veritabanı bağlantısı
+└── index/            # Frontend (HTML/CSS/JS)
+```
 
-## 💻 4. KURULUM VE LOKAL GELİŞTİRME REHBERİ
+## Öne Çıkan Endpoint'ler
+
+- `GET /api/articles` — makale arama/filtreleme
+- `GET /api/stats/summary` — dashboard özet istatistikleri
+- `GET /api/stats/top-authors` — en çok yayın yapan akademisyenler
+- `POST /api/sync` — manuel senkronizasyon tetikleme (`force` parametresiyle cache'i bypass eder)
+
+## Fotoğraflar
+
+<img width="1917" height="893" alt="ana ekran" src="https://github.com/user-attachments/assets/ff983bb3-5b69-4c9d-ae3c-1af851b488ce" />
+
+<img width="1917" height="902" alt="ana ekran 2" src="https://github.com/user-attachments/assets/d631d1a9-0000-4565-930a-b4c79c17cc2f" />
+
+<img width="1917" height="846" alt="akademisyen arama" src="https://github.com/user-attachments/assets/13b1d137-1257-410b-8106-f6fbfcf466db" />
+
+<img width="1917" height="885" alt="fakülte arama" src="https://github.com/user-attachments/assets/e4ae1d4e-d732-4818-b51e-78f94f638ecd" />
 
 
-Projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin.
 
-### 1. Depoyu Klonlayın
-### 2. Sanal Ortam (Virtual Environment) Oluşturun
-python -m venv venv
-source venv/bin/activate  # Windows için: venv\Scripts\activate
 
-### 3. Gerekli Kütüphaneleri Kurun
-Bash
-pip install -r requirements.txt
 
-### 4. Çevresel Değişkenleri (.env) Ayarlayın
-Proje dizininde bir .env dosyası oluşturun ve kendi bilgilerinizi ekleyin:
+## Amaç
 
-Kod snippet'i
-DATABASE_URL=postgresql://kullanici:sifre@ep-xxx.eu-central-1.aws.neon.tech/neondb
-SCOPUS_API_KEY=senin_scopus_api_anahtarin
-
-### 5. Backend Sunucusunu Başlatın
-Bash
-uvicorn main:app --reload
-
-API artık http://localhost:8000 adresinde çalışmaktadır. Swagger arayüzüne http://localhost:8000/docs adresinden ulaşabilirsiniz.
-
-6. Frontend'i Çalıştırın
-Herhangi bir sunucu kurulumuna gerek yoktur. Tarayıcınızda veya VS Code Live Server eklentisi ile doğrudan index.html dosyasını açarak paneli görüntüleyebilirsiniz.
-
-📡 5. API KULLANIMI (Endpoint Örnekleri)
-Sistem, dış dünya ile haberleşmek için RESTful standartlarını kullanır.
-
-Tüm Makaleleri Getir
-İstek: GET /api/articles?limit=50
-
-Örnek Yanıt (JSON):
-
-JSON
-[
-  {
-    "art_id": 1,
-    "scopus_id": "2-s2.0-85123456789",
-    "art_name": "Artificial Intelligence in LegalTech",
-    "publication_name": "Journal of Technology in Law",
-    "citedby_count": 42,
-    "authors": [
-      {
-        "auth_id": 1,
-        "auth_fullname": "Öz, Çağrı"
-      }
-    ]
-  }
-]
-```bash
-git clone [https://github.com/KULLANICI_ADIN/scopus-panel.git](https://github.com/KULLANICI_ADIN/scopus-panel.git)
-cd scopus-panel
+Rektörlük düzeyinde, üniversitenin mevcut sistemine (ABS) kıyasla kurum geneli, güncel ve fakülte bazlı kırılımlı Scopus yayın raporlaması sağlamak.
