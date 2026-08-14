@@ -227,17 +227,17 @@ def get_faculties(db: Session = Depends(get_db)):
 @app.get("/api/academics/search")
 def search_academics_endpoint(
     q: Optional[str] = Query(None, min_length=2, description="Aramak istediğiniz hoca adı"),
-    faculty_id: Optional[int] = Query(None, description="Fakülteye göre filtrele"),
+    faculty_name: Optional[str] = Query(None, description="Fakülteye göre filtrele (birleştirilmiş fakülte adı)"),
     db: Session = Depends(get_db),
 ):
     """Hoca adına ve/veya fakülteye göre arama endpoint'i."""
-    if not q and not faculty_id:
+    if not q and not faculty_name:
         raise HTTPException(
             status_code=400,
             detail="Arama için bir isim girin ya da bir fakülte seçin."
         )
 
-    results = crud.search_academics(db, query=q, faculty_id=faculty_id)
+    results = crud.search_academics(db, query=q, faculty_name=faculty_name)
     return [
         {
             "id": ac.id,

@@ -9,8 +9,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 import crud as crud
-from models import Article, Academic
-
+from models import Article, Academic, Author
 load_dotenv()
 
 # Genel ayarlar
@@ -417,12 +416,17 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
             continue
 
         if citation_changed and not is_new:
-            crud.upsert_article(
-                db=db, scopus_id=scopus_id, art_name=None, publication_name=None,
-                cover_date=None, doi=doi, citedby_count=item["citedby_count"],
-                author_objs=[], institution_objs=[],
-            )
-            total_processed += 1
+            try:
+                crud.upsert_article(
+                    db=db, scopus_id=scopus_id, art_name=None, publication_name=None,
+                    cover_date=None, doi=doi, citedby_count=item["citedby_count"],
+                    author_objs=[], institution_objs=[],
+                )
+                total_processed += 1
+            except Exception as e:
+                db.rollback()
+                total_failed += 1
+                print(f"[UYARI] scopus_id={scopus_id} (doi={doi}) atıf güncellemesi kaydedilemedi, atlandı: {e}")
             continue
 
         meta = None
@@ -445,8 +449,14 @@ def sync_scopus_data(db: Session, full_backfill: bool = False, force: bool = Fal
             print(f"[UYARI] {scopus_id} ({doi}) için ne OpenAlex ne Scopus'tan künye alınamadı, atlandı.")
             continue
 
-        _save_article(db, scopus_id, doi, item["citedby_count"], meta, metadata_source)
-        total_processed += 1
+        try:
+            _save_article(db, scopus_id, doi, item["citedby_count"], meta, metadata_source)
+            total_processed += 1
+        except Exception as e:
+            db.rollback()
+            total_failed += 1
+            print(f"[UYARI] scopus_id={scopus_id} (doi={doi}) kaydedilemedi, atlandı: {e}")
+            continue
 
     crud.log_sync_run(
         db, source=SYNC_SOURCE, status="success", records_fetched=total_processed,

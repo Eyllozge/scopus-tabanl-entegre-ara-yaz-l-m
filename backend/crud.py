@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import IntegrityError
 from models import Article, Author, Faculty, Academic, Institution, SyncLog
 
 
@@ -98,19 +99,56 @@ def upsert_article(
             article.publication_name = publication_name
         if metadata_source:
             article.metadata_source = metadata_source
-    else:
-        article = Article(
-            scopus_id=scopus_id, art_name=art_name, publication_name=publication_name,
-            cover_date=cover_date, doi=doi, citedby_count=citedby_count,
-            abstract=abstract, keywords=keywords, metadata_source=metadata_source,
-        )
-        article.authors = author_objs
-        article.institutions = institution_objs
-        db.add(article)
+        for a in author_objs:
+            if a not in article.authors:
+                article.authors.append(a)
+        for i in institution_objs:
+            if i not in article.institutions:
+                article.institutions.append(i)
+        db.commit()
+        db.refresh(article)
+        return article
 
-    db.commit()
-    db.refresh(article)
-    return article
+    # Yeni makale — ama aynı DOI ile daha önce kaçırılmış bir eşleşme/yarış durumu ihtimaline karşı korumalı insert
+    new_article = Article(
+        scopus_id=scopus_id, art_name=art_name, publication_name=publication_name,
+        cover_date=cover_date, doi=doi, citedby_count=citedby_count,
+        abstract=abstract, keywords=keywords, metadata_source=metadata_source,
+    )
+    new_article.authors = author_objs
+    new_article.institutions = institution_objs
+    db.add(new_article)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        print(f"[UYARI] scopus_id={scopus_id} (doi={doi}) INSERT çakıştı, mevcut kayıt DOI ile bulunup güncelleniyor.")
+        existing_article = db.query(Article).filter(Article.doi == doi).first() if doi else None
+        if not existing_article:
+            existing_article = db.query(Article).filter(Article.scopus_id == scopus_id).first()
+        if not existing_article:
+            raise
+        existing_article.citedby_count = citedby_count
+        existing_article.abstract = abstract or existing_article.abstract
+        existing_article.keywords = keywords or existing_article.keywords
+        if art_name:
+            existing_article.art_name = art_name
+        if publication_name:
+            existing_article.publication_name = publication_name
+        if metadata_source:
+            existing_article.metadata_source = metadata_source
+        for a in author_objs:
+            if a not in existing_article.authors:
+                existing_article.authors.append(a)
+        for i in institution_objs:
+            if i not in existing_article.institutions:
+                existing_article.institutions.append(i)
+        db.commit()
+        db.refresh(existing_article)
+        return existing_article
+
+    db.refresh(new_article)
+    return new_article
 
 
 def log_sync_run(db: Session, source: str, status: str, records_fetched: int = 0, note: str = None):
@@ -152,7 +190,18 @@ def list_faculties(db: Session):
         .order_by(Faculty.name)
         .all()
     )
-    return [{"id": f.id, "name": f.name, "unit_type": f.unit_type, "academic_count": count} for f, count in rows]
+
+    # "Fen Fakültesi - Biyoloji", "Fen Fakültesi - Fizik" gibi bölüm bazlı
+    # kayıtları tek bir "Fen Fakültesi" başlığında topluyoruz. Enstitü ve
+    # MYO isimlerinde " - " geçmediği için bunlar zaten oldukları gibi kalır.
+    merged: dict[str, dict] = {}
+    for f, count in rows:
+        base_name = f.name.split(" - ")[0].strip()
+        if base_name not in merged:
+            merged[base_name] = {"id": base_name, "name": base_name, "unit_type": f.unit_type, "academic_count": 0}
+        merged[base_name]["academic_count"] += count
+
+    return sorted(merged.values(), key=lambda x: x["name"])
 
 
 def get_or_create_faculty(db: Session, name: str, unit_type: str = None, source_subdomain: str = None):
@@ -252,10 +301,14 @@ def match_academics_to_authors(db: Session):
     return matched
 
 
-def search_academics(db: Session, query: str = None, faculty_id: int = None):
+def search_academics(db: Session, query: str = None, faculty_name: str = None):
     base = db.query(Academic).options(joinedload(Academic.faculty), joinedload(Academic.author))
-    if faculty_id:
-        base = base.filter(Academic.faculty_id == faculty_id)
+    if faculty_name:
+        # "Fen Fakültesi" seçilince hem "Fen Fakültesi" hem de
+        # "Fen Fakültesi - Biyoloji" gibi tüm bölüm alt kayıtlarını kapsar.
+        base = base.join(Academic.faculty).filter(
+            (Faculty.name == faculty_name) | (Faculty.name.like(f"{faculty_name} - %"))
+        )
 
     academics = base.all()
 

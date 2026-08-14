@@ -527,7 +527,7 @@ async function runAcademicSearch(name, facultyId) {
   try {
     const params = new URLSearchParams();
     if (name) params.set('q', name);
-    if (facultyId) params.set('faculty_id', facultyId);
+    if (facultyId) params.set('faculty_name', facultyId);
 
     const res = await fetch(`${API_BASE_URL}/api/academics/search?${params.toString()}`);
     if (!res.ok) throw new Error();
